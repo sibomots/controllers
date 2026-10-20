@@ -1,0 +1,74 @@
+-- ============================================================================
+-- This file is part of Bifrost
+--
+-- Copyright (c) 2025 Jeff Wandling
+-- All Rights Reserved.
+--
+-- Licensed under BSD 3-Clause
+-- Redistribution and use in source and binary forms, with or without
+-- modification, are permitted under the terms of the BSD 3-Clause license.
+-- See the LICENSE file for the full text.
+-- ============================================================================
+
+project Bifrost is
+
+   -- Board selection: only one board's lowlevel/board/<name>/src
+   -- directory is ever in Source_Dirs for a given build, so a
+   -- mismatched board's constants are never in the compiled closure,
+   -- not merely present and guarded. Override with -XBOARD=<name>;
+   -- an unrecognized name is a hard project-file error (Board_Kind is
+   -- a strict enumeration), not a silent fallback.
+   --
+   -- "stm32f722ze" is the only board registered here so far (what the
+   -- current UART/LCD work was built and proven on). See
+   -- ../../HARDWARE.md: NUCLEO-F767ZI is the preferred board for Ada
+   -- going forward (required once tasking is involved) -- it will get
+   -- its own sibling entry here once that board is in hand.
+   type Board_Kind is ("stm32f722ze");
+   Board : Board_Kind := external ("BOARD", "stm32f722ze");
+
+   for Target use "arm-eabi";
+   for Runtime ("Ada") use "light-cortex-m7f";
+
+   for Source_Dirs use
+     ("app/src",
+      "behavioral/src",
+      "lowlevel/src",
+      "lowlevel/board/" & Board & "/src");
+
+   for Object_Dir use "obj";
+   for Exec_Dir use "bin";
+   for Main use ("main.adb");
+
+   package Builder is
+      -- gprbuild's default output name is the main source file's base
+      -- name ("main") -- this renames it to match the C side's
+      -- bifrost.elf for parity.
+      for Executable ("main.adb") use "bifrost.elf";
+   end Builder;
+
+   package Compiler is
+      for Default_Switches ("Ada") use
+        ("-g",
+         "-mcpu=cortex-m7",
+         "-mthumb",
+         "-mfpu=fpv5-sp-d16",
+         "-mfloat-abi=hard",
+         "-ffunction-sections",
+         "-fdata-sections");
+   end Compiler;
+
+   package Linker is
+      for Default_Switches ("Ada") use
+        ("-T", Project'Project_Dir & "config/stm32f722ze.ld",
+         "-mcpu=cortex-m7",
+         "-mthumb",
+         "-mfpu=fpv5-sp-d16",
+         "-mfloat-abi=hard",
+         "-Wl,--gc-sections",
+         "-Wl,-Map," & Project'Project_Dir & "bin/bifrost.map",
+         "-nostartfiles",
+         "-Wl,-e,Reset_Handler");
+   end Linker;
+
+end Bifrost;

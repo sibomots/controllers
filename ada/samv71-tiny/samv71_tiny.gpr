@@ -1,0 +1,103 @@
+-- ============================================================================
+-- This file is part of samv71-tiny
+--
+-- Copyright (c) 2025 Jeff Wandling
+-- All Rights Reserved.
+--
+-- Licensed under BSD 3-Clause
+-- Redistribution and use in source and binary forms, with or without
+-- modification, are permitted under the terms of the BSD 3-Clause license.
+-- See the LICENSE file for the full text.
+-- ============================================================================
+
+-- Ada port of c/samv71-tiny, targeting the SAMV71 Xplained Ultra board.
+--
+-- Unlike bifrost (which has no board-specific runtime and hand-rolls its
+-- own vector table, startup, and PLL bring-up in lowlevel/src/bifrost-
+-- startup.adb), this board has a real AdaCore bb-runtimes BSP bundled with
+-- the toolchain. Selecting "light-tasking-samv71" below pulls in, via that
+-- runtime's own runtime.xml (installed under
+-- <gnat-prefix>/arm-eabi/lib/gnat/light-tasking-samv71/runtime.xml),
+-- *required* compiler switches (-mcpu=cortex-m7 -mfloat-abi=hard
+-- -mfpu=fpv5-d16 etc.) and *required* linker switches (runtime adalib
+-- path, and -T pointing at the runtime's own bundled linker script) --
+-- none of that is specified here because it is not optional configuration,
+-- it is forced in unconditionally by the runtime itself the moment it is
+-- selected. There is no lowlevel/src/*-startup.adb in this project for
+-- that reason: the runtime's own start-rom.S supplies the vector table,
+-- Reset Handler equivalent, and .data/.bss init.
+--
+-- That runtime.xml also defines a "LOADER" scenario variable
+-- (ROM | SAMBA | RAM | USER, default ROM) selecting which of the
+-- runtime's bundled linker scripts (common-ROM.ld / common-SAMBA.ld /
+-- common-RAM.ld) gets used -- ROM (boot from flash) is what this project
+-- wants and is already the default, so it is not overridden here. Pass
+-- -XLOADER=RAM to gprbuild instead, if ever debugging a RAM-resident
+-- image is useful.
+project Samv71_Tiny is
+
+   for Target use "arm-eabi";
+   for Runtime ("Ada") use "light-tasking-samv71";
+
+   -- Grows as later phases add rtbus/src, tinymon/src -- deliberately
+   -- not declared ahead of having anything to put in them.
+   for Source_Dirs use
+     ("app/src",
+      "lowlevel/src");
+
+   for Object_Dir use "obj";
+   for Exec_Dir use "bin";
+   for Main use ("main.adb");
+
+   package Builder is
+      -- gprbuild's default output name is the main source file's base
+      -- name ("main") -- this renames it to match the C side's
+      -- image.elf for parity.
+      for Executable ("main.adb") use "image.elf";
+   end Builder;
+
+   package Compiler is
+      for Default_Switches ("Ada") use
+        ("-g",
+         "-ffunction-sections",
+         "-fdata-sections");
+
+      -- -gnatwI ("I" disables, lowercase "i" is GNAT's default-on
+      -- state) silences "<unit> is an internal GNAT unit"/"non-portable
+      -- and version-dependent" specifically -- a known, accepted,
+      -- documented risk for exactly these 5 files, not a blanket
+      -- warning suppression. Every one of them depends on
+      -- Interfaces.SAM (AdaCore's unversioned, bundled-with-the-runtime
+      -- SAMV71 register/address definitions) because this project
+      -- deliberately builds on light-tasking-samv71's real bb-runtimes
+      -- BSP rather than hand-rolling startup/PLL/register access from
+      -- scratch (see the project comment above, and
+      -- lowlevel/src/samv71_tiny-usart_regs.ads's header comment for
+      -- the full rationale). The actual risk this warning flags --
+      -- breakage on a future GNAT/runtime upgrade, at compile time, not
+      -- a silent correctness problem now -- is accepted, not fixed:
+      -- these 4 files are the exact, bounded checklist to re-verify
+      -- against whatever Interfaces.SAM looks like in a new toolchain
+      -- version, should that day come. Every other file in this
+      -- project keeps the default warning active, so an *accidental*
+      -- new dependency on some other internal unit in a later phase
+      -- still gets flagged normally.
+      for Switches ("samv71_tiny-usart_regs.ads") use
+        Compiler'Default_Switches ("Ada") & ("-gnatwI");
+      for Switches ("samv71_tiny-wdt_regs.ads") use
+        Compiler'Default_Switches ("Ada") & ("-gnatwI");
+      for Switches ("samv71_tiny-matrix_regs.ads") use
+        Compiler'Default_Switches ("Ada") & ("-gnatwI");
+      for Switches ("samv71_tiny-usart1.adb") use
+        Compiler'Default_Switches ("Ada") & ("-gnatwI");
+      for Switches ("samv71_tiny-exec_cmd.adb") use
+        Compiler'Default_Switches ("Ada") & ("-gnatwI");
+   end Compiler;
+
+   package Linker is
+      for Default_Switches ("Ada") use
+        ("-Wl,--gc-sections",
+         "-Wl,-Map," & Project'Project_Dir & "bin/image.map");
+   end Linker;
+
+end Samv71_Tiny;
