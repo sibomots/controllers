@@ -1,0 +1,6 @@
+**/bin
+**/obj
+
+# JLinkGDBServer debug-session logs (setupw.sh's "-log server.out"),
+# wherever the server was started from.
+*.out
