@@ -13,17 +13,19 @@
 -->
 # C Software Design
 
-This directory holds two C applications: `f722ze-tiny` (internally
-named `bifrost`) and `samv71-tiny` (internally `m7`, the C reference
+This directory holds three C applications: `f722ze-tiny` (internally
+named `bifrost`), `f767zi` (the same `bifrost` application ported to
+NUCLEO-F767ZI), and `samv71-tiny` (internally `m7`, the C reference
 implementation `ada/samv71-tiny` was later ported from). See
 [`README.md`](README.md) for how they compare board-for-board; this
-document explains the architecture of both. Most of what follows is
-written through `f722ze-tiny`'s specific implementation choices --
-`samv71-tiny` shares the same general requirements (linker script,
-vector table, `main` after reset) but diverges in the specifics, most
-notably in actually binding to a real vendor BSP where `f722ze-tiny`
-has none. Each divergence is called out explicitly below rather than
-left implicit.
+document explains the architecture of all three. Most of what follows
+is written through `f722ze-tiny`'s specific implementation choices --
+`f767zi` is structurally identical to it (see "How `f767zi` Differs"
+below), and `samv71-tiny` shares the same general requirements (linker
+script, vector table, `main` after reset) but diverges in the
+specifics, most notably in actually binding to a real vendor BSP where
+`f722ze-tiny` has none. Each divergence is called out explicitly below
+rather than left implicit.
 
 The name of the software application is `bifrost`.
 
@@ -171,6 +173,36 @@ against RM0431 (see BSP and Drivers, above). `samv71-tiny` does use it
 the Atmel/Microchip SAMV71 Device Family Pack, both pulled in as
 source and compiled as part of the build, not merely referenced in
 documentation.
+
+# How `f767zi` Differs
+
+Nothing architecturally -- `f767zi` uses the exact same `app`/
+`behavioral`/`lowlevel`/`interfaces` layout, the same CMake project
+name (`bifrost`), the same component structure, and the same source
+files as `f722ze-tiny`, copied over verbatim except for the files
+listed below. This target deliberately keeps `f722ze-tiny`'s
+HSI-16MHz/no-PLL clock approach rather than bringing up a PLL for this
+chip, so none of the register-level driver code (`usart3.c`, `gpio.h`,
+`delay.c`, `lcd_NHD_0108HZ.c`) needed any change at all -- the STM32F7
+family's peripheral memory map is identical across F722ZE and F767ZI.
+
+Only three things actually differ:
+
+* `config/stm32f767zi.ld` -- `FLASH` 2048K (was 512K), `RAM` 512K (was
+  256K). Verified in the linked ELF's own map file, not just the
+  linker-script source: `FLASH` length `0x00200000`, `RAM` length
+  `0x00080000`.
+* `config/src/startup_stm32f767.c` -- renamed from
+  `startup_stm32f722.c` (and the file's own internal comment updated
+  to match); the vector table and `Reset_Handler` logic inside it are
+  unchanged.
+* Two stale comment references to the old startup filename, in
+  `gpio.h` and `usart3.h` (`USART3_IRQn`'s and `USART3_IRQHandler`'s
+  own cross-reference comments), updated to point at the new name.
+
+Not yet flashed to physical NUCLEO-F767ZI hardware -- verified so far
+by a real `cmake`/`arm-none-eabi-gcc` build only (clean, no warnings,
+correct `FLASH`/`RAM` lengths in the resulting map file).
 
 # How samv71-tiny is Organized
 

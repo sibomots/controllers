@@ -170,8 +170,13 @@ differences from the C tree, both deliberate:
 since git does not track empty directories) mirroring the C tree's directories of the same name and
 intent -- reserved for the ohmmeter calculation and client logic respectively, not yet ported. What *is*
 in `behavioral/` is `Bifrost.TinyMon` (`bifrost-tinymon.ads/.adb`), the console line editor/dispatcher
-running over `Bifrost.UART`. See [`../README.md`](README.md#status) for the current state of what has
-and has not been carried over from the C application.
+running over `Bifrost.UART`. Its welcome banner and `help` command both print the target hardware
+description, a hand-maintained software version string, and a one-line license notice (plus the new
+`license` command, which prints just that last line on demand) -- the version string is deliberately not
+derived from the git commit SHA, since a build can't know the SHA of the commit that will contain it; a
+plain, hand-edited constant avoids that chicken-and-egg problem entirely. See
+[`../README.md`](README.md#status) for the current state of what has and has not been carried over from
+the C application.
 
 ## Major Components
 

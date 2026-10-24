@@ -51,11 +51,15 @@ is still blocked exactly as described, *for this tree*.
 
 The three-task design itself is no longer blocked overall -- it lives
 in `ada/f767zi/`, a separate tree targeting NUCLEO-F767ZI with the real
-`light-tasking-stm32f769disco` Ravenscar runtime (see
+`light-tasking-stm32f769disco` Ravenscar runtime, and is now running on
+real hardware: `Main`/`LCD_Sink`/`UART_Sink` all active, UART/TinyMon
+console confirmed over the physical board (see
 [`HARDWARE.md`](HARDWARE.md) and
-[`ada/README.md`](ada/README.md#f767zi-nucleo-f767zi)). `ada/f722ze-tiny/`
-itself is not being migrated to tasking -- this remains an accurate,
-current description of that specific tree, not a stale one.
+[`ada/README.md`](ada/README.md#f767zi-nucleo-f767zi) for the full
+status, including an open clock-tree issue -- see item 4 below).
+`ada/f722ze-tiny/` itself is not being migrated to tasking -- this
+remains an accurate, current description of that specific tree, not a
+stale one.
 
 ## 2. Why NUCLEO-F722ZE can't host that design
 
@@ -200,6 +204,55 @@ message to the gdb console instead of trapping opaquely -- a real
 improvement to debuggability, independent of and not required for
 either the tasking work in section 2 or any currently-working code
 path.
+
+## 4. `ada/f767zi`'s clock tree runs at ~1/3 of its configured target -- root cause unknown
+
+Real NUCLEO-F767ZI hardware, running `ada/f767zi`, behaves in a way no
+register inspection explains. `RCC_CR`/`RCC_CFGR` report everything
+consistent with the intended `PCLK1` = 50MHz -- `HSERDY`/`PLLRDY` both
+set, `SW`/`SWS` = PLL, correct `HPRE`/`PPRE1` prescalers -- but the
+clock actually reaching peripherals measures at very close to 1/3 of
+that, confirmed two independent ways: the UART needs a terminal set to
+38400 instead of the ~115200 the `BRR` math targets for 50MHz, and
+`Ada.Real_Time` ticks at 1/3 rate over a real, stopwatch-timed
+30-second interval.
+
+A strong candidate theory -- `HSE_Bypass => True`, since this board's
+HSE (until a real crystal is populated at X3) is an actively-driven
+ST-LINK MCO signal rather than a passive crystal, and feeding that into
+a non-bypass oscillator circuit is a known failure mode -- was tried
+and **disproven** by a real-hardware retest: rebuilt with the fix in
+place, reflashed, still 38400. That change is left in the runtime
+override (harmless, just not the fix).
+
+The current workaround is at the symptom, not the cause:
+`ada/f767zi/lowlevel/src/bifrost-uart.adb`'s `BRR` targets the
+*measured* ~16.667MHz effective clock directly, documented as a patch
+in that file's own comment, not a fix. If this is ever revisited: the
+real root cause is still open, and if it's found and fixed upstream,
+both that `BRR` value (back to targeting the true 50MHz) and any
+`Ada.Real_Time`-driven timing elsewhere in that port need re-checking,
+since they ride the same clock tree and are currently running ~3x
+faster than their nominal periods would suggest. See
+`ada/f767zi/runtime-overrides/README.md` for the full account.
+
+## 5. Intermittent SWD examination failures on the `f767zi` board, unexplained
+
+While debugging `ada/f767zi` over OpenOCD/ST-Link, the target
+intermittently failed to examine (`Cortex-M PARTNO 0x0 is unrecognized`,
+later `timed out while waiting for target halted` / `auto_probe failed`)
+across several power cycles and adapter-speed changes (2000/400/200kHz),
+with no consistent trigger found. A same-cable/same-host/same-OpenOCD
+control test against the known-working `c/f722ze-tiny` board, run
+immediately after a failure on the `f767zi` board, worked flawlessly --
+isolating the problem to this specific board/connection, not the host
+setup. No root cause has been identified; it is genuinely intermittent,
+not deterministically reproducible, and examination has been observed
+to succeed again without any configuration change. Worth knowing if
+this recurs: it is not evidence the board is damaged (the debug port
+has separately been confirmed to work independently of firmware state
+on this same board), and no destructive flash operation has ever
+failed to complete on it.
 
 <hr>
 Copyright 2025 Jeff Wandling<br>

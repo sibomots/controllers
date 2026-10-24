@@ -25,20 +25,24 @@ shared by both projects below. There is also a
 [Software Design Document](SOFTWARE.md) here that explains the
 architecture of both.</i>
 
-## Two projects, two boards
+## Three projects, three boards
 
-|  | `f722ze-tiny` | `samv71-tiny` |
-|---|---|---|
-| Board | NUCLEO-F722ZE (STM32F722ZET6) | SAMV71 Xplained Ultra (ATSAMV71Q21B) |
-| Internal name | `bifrost` (CMake project `bifrost`) | `m7` (CMake project `m7`, executable `image.elf`) |
-| Console UART | USART3 (ST-Link VCP) | USART1 (on-board EDBG) |
-| Vendor BSP | none -- all registers hand-written | yes -- CMSIS + Atmel/Microchip SAMV71 DFP (`main/vendor/`) |
-| Debug probe | ST-Link (OpenOCD) | SEGGER J-Link |
-| Status | LCD counter demo + TinyMon console | complete: TinyMon console, RTBus wire protocol, command dispatch |
+|  | `f722ze-tiny` | `f767zi` | `samv71-tiny` |
+|---|---|---|---|
+| Board | NUCLEO-F722ZE (STM32F722ZET6) | NUCLEO-F767ZI (STM32F767ZI) | SAMV71 Xplained Ultra (ATSAMV71Q21B) |
+| Internal name | `bifrost` (CMake project `bifrost`) | `bifrost` (CMake project `bifrost`) | `m7` (CMake project `m7`, executable `image.elf`) |
+| Console UART | USART3 (ST-Link VCP) | USART3 (ST-Link VCP) | USART1 (on-board EDBG) |
+| Vendor BSP | none -- all registers hand-written | none -- all registers hand-written | yes -- CMSIS + Atmel/Microchip SAMV71 DFP (`main/vendor/`) |
+| Debug probe | ST-Link (OpenOCD) | ST-Link (OpenOCD) | SEGGER J-Link |
+| Status | LCD counter demo + TinyMon console; built/flashed/run on real hardware | LCD counter demo + TinyMon console; builds and links clean against the real toolchain, not yet flashed to physical hardware | complete: TinyMon console, RTBus wire protocol, command dispatch |
 
 `f722ze-tiny` is an LCD-counter demo with an interrupt-driven,
 bidirectional TinyMon console over UART -- originally laid as the
-foundation for a small ohmmeter application. `samv71-tiny` is a
+foundation for a small ohmmeter application. `f767zi` is the same
+application ported to NUCLEO-F767ZI, deliberately keeping the same
+HSI-16MHz/no-PLL clock approach rather than bringing up a PLL, so only
+the linker script's memory map actually differs (2MB Flash / 512KB RAM
+instead of 512KB/256KB) -- see "f767zi" below. `samv71-tiny` is a
 from-scratch MIL-1553-style binary packet protocol (`rtbus`) and
 command dispatcher, also fronted by its own TinyMon console -- an
 unrelated application, not a variant of `f722ze-tiny`. `samv71-tiny` is
@@ -84,7 +88,7 @@ Local reference copies of the above, plus the LCD component datasheet used by th
 `main.c` drives an LCD counter demo on a third-party character display
 (NHD-0108HZ-FSW-GBW, connected via GPIO) alongside an interrupt-driven,
 bidirectional USART3 console (`usart3.c`) running a TinyMon command
-dispatcher (`tinymon.c`, `help`/`count` commands) -- the foundation for
+dispatcher (`tinymon.c`, `help`/`count`/`license` commands) -- the foundation for
 the ohmmeter application this project is building toward. See
 [`SOFTWARE.md`](SOFTWARE.md) for the full architecture (super-loop
 design, `app`/`behavioral`/`lowlevel`/`interfaces` component roles,
@@ -271,6 +275,57 @@ Breakpoint 1, main () at C:/Users/jdw/ohm/OhmMeter/bifrost/app/src/main.c:19
 </code>
 </pre>
 
+# f767zi (NUCLEO-F767ZI)
+
+This is the C implementation of `bifrost` ported to the NUCLEO-F767ZI
+-- internally still named `bifrost` (CMake project `bifrost`,
+executable `bifrost.elf`), same as `f722ze-tiny`; this is a different
+top-level directory for the same application, not a different one.
+
+## Target Hardware
+
+STM32F767ZI, Cortex-M7 (same core, different memory map, from the same
+STM32F7 family as F722ZE -- see [`../HARDWARE.md`](../HARDWARE.md)).
+
+## Software
+
+Deliberately a minimal port: this target keeps `f722ze-tiny`'s
+HSI-16MHz/no-PLL clock approach rather than bringing up a PLL, so
+register addresses, the UART baud divisor (`USART3_BRR = 139`, correct
+for 115200 at HSI 16MHz), and the delay-loop calibration constants all
+carry over from `f722ze-tiny` unchanged. Only `config/stm32f767zi.ld`
+actually changes -- `FLASH`/`RAM` lengths updated to this chip's real
+2MB/512KB (confirmed in the linked ELF's own map file, not just the
+source: `FLASH` length `0x00200000`, `RAM` length `0x00080000`) -- plus
+the startup file's name (`startup_stm32f767.c`) and a couple of
+now-stale comment references to it, for consistency. Same TinyMon
+console as `f722ze-tiny` (`help`/`count`/`license`), same LCD driver,
+same delay/UART drivers byte-for-byte.
+
+## Build
+
+Toolchain prerequisites: see [`SETUP.md`](SETUP.md) -- identical to
+`f722ze-tiny`, nothing board-specific to install.
+
+From `f767zi/`:
+
+```
+$ cd f767zi
+$ bash buildw.sh
+```
+
+Verified with a real `cmake`/`arm-none-eabi-gcc` build: configures and
+links clean, no warnings, producing `build/bifrost.elf` with the
+correct `FLASH`/`RAM` lengths in its own map file (checked directly,
+not assumed from the linker script source alone).
+
+## Debugging
+
+Same ST-Link/OpenOCD chain as `f722ze-tiny` -- same physical debug
+probe, same board family, same stock `target/stm32f7x.cfg`. Not yet
+flashed to physical hardware; no GDB session transcript or proof-of-life
+capture exists for this port yet (unlike `f722ze-tiny` above).
+
 # samv71-tiny (SAMV71 Xplained Ultra)
 
 This is `samv71-tiny`, the C firmware this session's `ada/samv71-tiny`
@@ -289,8 +344,9 @@ pair `f722ze-tiny` targets, not a related or interchangeable board.
 ## Software
 
 A tokenizer/state-machine command dispatcher (`tinymon.c`, stand-in
-`cmda`/`cmdb`/`cmdc` commands, same deliberate minimalism as
-`f722ze-tiny`'s `help`/`count`) running over USART1 -- this board's
+`cmda`/`cmdb`/`cmdc` commands plus `help`/`license`, same deliberate
+minimalism as `f722ze-tiny`'s `help`/`count`/`license`) running over
+USART1 -- this board's
 on-board EDBG debug UART (PA21/PB4), not a separate ST-Link-style VCP
 chip. Underneath the console is `rtbus/` -- a MIL-1553-style binary
 packet protocol (frame sync, a CRC-16-checked header, a payload

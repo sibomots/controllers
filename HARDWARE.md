@@ -99,16 +99,29 @@ of its own.
 
 The tasking phase lives in its own tree instead, `ada/f767zi/`: real
 Ravenscar tasking (Main/`LCD_Sink`/`UART_Sink`, protected-object UART,
-no hand-written startup -- the runtime supplies it), written and
-verified to compile/bind clean against the real toolchain, but not yet
-run on actual F767ZI hardware -- still no board in hand. See
-[`ada/README.md`](ada/README.md#f767zi-nucleo-f767zi) and
-`ada/f767zi/runtime-overrides/README.md` for a real, concrete
-consequence of not having the board yet: this board's actual HSE
-(8MHz) differs from the installed `light-tasking-stm32f769disco`
-profile's own default (25MHz, calibrated for the unrelated
-STM32F769-Discovery board), discovered and fixed by reading the
-runtime's own clock bring-up source rather than assumed.
+no hand-written startup -- the runtime supplies it), now running on
+actual F767ZI hardware -- UART/TinyMon console confirmed over SWD, LCD
+not yet wired (no physical display on hand). Getting it running
+surfaced two real issues: the installed `light-tasking-stm32f769disco`
+profile's own clock constants are calibrated for the unrelated
+STM32F769-Discovery board's 25MHz crystal, not this board's actual
+8MHz HSE (fixed via a `gnat_user` override); and the board's actual
+clock, once running, measures at ~1/3 of its configured target for
+reasons still not understood (a disproven `HSE_Bypass` theory and the
+current symptom-level UART `BRR` workaround are both documented in
+`ada/f767zi/runtime-overrides/README.md` and
+[`KNOWN_ISSUES.md`](KNOWN_ISSUES.md)). See
+[`ada/README.md`](ada/README.md#f767zi-nucleo-f767zi) for the full
+account.
+
+The C side has also been ported to F767ZI, at `c/f767zi/` -- same
+application, same CMake-based build as `c/f722ze-tiny/`, with only the
+linker script's memory map changed (2MB Flash / 512KB RAM instead of
+512KB/256KB) per the porting notes below; register addresses, UART
+baud divisor, and delay-loop constants carry over unchanged across the
+STM32F7 family. Builds and links clean against the real
+`arm-none-eabi-gcc`/CMake toolchain; not yet flashed to physical
+F767ZI hardware.
 
 `samv71-tiny`'s Ada port is complete and fully verified on the SAMV71
 Xplained Ultra: real Ravenscar tasking, interrupt-driven USART1 I/O, the
@@ -129,6 +142,16 @@ not rewriting logic -- but it must be re-verified per board, not
 assumed to carry over. (None of this applies to `samv71-tiny` --
 different vendor, different architecture family in all but the shared
 Cortex-M7 core; that's a separate application, not a porting target.)
+
+This is exactly what the C port (`c/f767zi/`) did in practice: the C
+target keeps the HSI-16MHz/no-PLL clock approach rather than bringing
+up a PLL, so register addresses, the UART baud divisor, and the
+delay-loop calibration constants all carried over from `c/f722ze-tiny/`
+unchanged -- only the linker script's `FLASH`/`RAM` lengths needed to
+change. The Ada port (`ada/f767zi/`) is architecturally a bigger jump,
+not a smaller one, because it also switches on real Ravenscar tasking
+(a different GNAT runtime entirely, not just a different memory map)
+-- see [`ada/README.md`](ada/README.md#f767zi-nucleo-f767zi).
 
 <hr>
 Copyright 2025 Jeff Wandling<br>

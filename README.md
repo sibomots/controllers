@@ -31,7 +31,7 @@ vendors' silicon:
 
 | Application | Directories | Board | Vendor |
 |---|---|---|---|
-| **bifrost** | `f722ze-tiny` (`c/f722ze-tiny`, `ada/f722ze-tiny`) | NUCLEO-F722ZE / NUCLEO-F767ZI | STMicroelectronics (STM32F7) |
+| **bifrost** | `f722ze-tiny` (`c/f722ze-tiny`, `ada/f722ze-tiny`), `f767zi` (`c/f767zi`, `ada/f767zi`) | NUCLEO-F722ZE / NUCLEO-F767ZI | STMicroelectronics (STM32F7) |
 | **samv71-tiny** | `samv71-tiny` (`c/samv71-tiny`, `ada/samv71-tiny`) | SAMV71 Xplained Ultra | Microchip/Atmel (SAMV71) |
 
 `bifrost` is an LCD-counter demo with an interrupt-driven, bidirectional
@@ -42,7 +42,7 @@ protocol (`rtbus`) and a stand-in command dispatcher, also fronted by
 its own TinyMon console -- an unrelated application, not a variant of
 `bifrost`.
 
-The directory names (`f722ze-tiny`, `samv71-tiny`) follow a
+The directory names (`f722ze-tiny`, `f767zi`, `samv71-tiny`) follow a
 board-then-app naming convention; the applications' own internal
 identities (`Bifrost.*` Ada packages, `bifrost.gpr`, the C `bifrost`
 CMake project; `Samv71_Tiny.*` / `samv71_tiny.gpr` / C's `m7_*` targets)
@@ -71,10 +71,16 @@ Start with [`c/README.md`](c/README.md) or [`ada/README.md`](ada/README.md),
 whichever language you're interested in -- each links onward to its own
 `SETUP.md` and `SOFTWARE.md`. See [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md)
 for current, real limitations and why they exist (notably: `bifrost`'s
-Ada target has no Ravenscar tasking yet and runs its console via a
-polled, interrupt-fed main loop instead, unlike `samv71-tiny`'s Ada
-port, which has real tasking and a genuine console task -- a difference
-in available toolchain support per board, not a design choice).
+`ada/f722ze-tiny` tree has no Ravenscar tasking and runs its console via
+a polled, interrupt-fed main loop instead -- a limitation of that
+specific board's toolchain support, not of `bifrost` as a whole;
+`ada/f767zi` has real tasking and is running on hardware, same as
+`samv71-tiny`'s Ada port, though with an open, unexplained clock-tree
+issue of its own).
+
+For a fast, do-once dev-environment setup across all six
+board/language combinations (not the detailed rationale -- just the
+steps), see [`QUICK_PRIMER.md`](QUICK_PRIMER.md).
 
 <hr>
 Copyright 2025 Jeff Wandling<br>

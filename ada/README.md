@@ -37,7 +37,7 @@ architecture of both.</i>
 | Interrupt-driven I/O | yes, but hand-rolled (extended vector table + plain ISR procedure + lock-free ring buffers) | yes, idiomatic Ravenscar (`pragma Attach_Handler`, protected entries) | yes, idiomatic Ravenscar (`pragma Attach_Handler`, protected entries) |
 | Vector table / startup | hand-written (`Bifrost.Startup`) -- no board BSP exists | supplied by the runtime's own `start-rom.S` -- nothing to hand-write | supplied by the runtime's own `start-rom.S` -- nothing to hand-write |
 | Debug probe | ST-Link (OpenOCD) | ST-Link (OpenOCD) | SEGGER J-Link |
-| Status | LCD counter demo + TinyMon console, no tasking (this is the tree that stays that way -- see `f767zi` for the tasking phase) | LCD counter demo + TinyMon console with real Main/`LCD_Sink`/`UART_Sink` tasking (`../SOFTWARE.md`); compiles and binds clean against the real toolchain, not yet run on actual hardware | all 6 planned phases complete and verified |
+| Status | LCD counter demo + TinyMon console, no tasking (this is the tree that stays that way -- see `f767zi` for the tasking phase) | LCD counter demo + TinyMon console with real Main/`LCD_Sink`/`UART_Sink` tasking (`../SOFTWARE.md`); running on real hardware (UART/TinyMon confirmed; LCD not yet wired) | all 6 planned phases complete and verified |
 
 The short version: `f722ze-tiny` is what this Ada effort started on, and
 it's a real, working bare-metal Ada program -- but the board itself has
@@ -68,8 +68,8 @@ This port now has the full bare-metal startup chain (vector table,
 Reset Handler, `.data`/`.bss` init, GNAT elaboration), the LCD counter
 demo ported from the C side, and an interrupt-driven, bidirectional
 USART3 driver (`Bifrost.UART`) carrying a TinyMon console
-(`Bifrost.TinyMon`, `help`/`count` commands) -- both running from the
-same non-tasking main loop (no Ravenscar runtime exists for this
+(`Bifrost.TinyMon`, `help`/`count`/`license` commands) -- both running
+from the same non-tasking main loop (no Ravenscar runtime exists for this
 board; see [`../HARDWARE.md`](../HARDWARE.md)), with the console polled
 non-blockingly each iteration alongside the LCD update. The ohmmeter
 calculation/client logic in `behavioral/` has not been ported
@@ -395,26 +395,33 @@ rename from the C tree's naming.
 Running on real hardware: `Main` reaches `Bifrost.UART.Initialize`
 (confirmed by reading `USART3.CR1` directly over SWD, not by trusting
 any single tool), and the TinyMon welcome banner/prompt is confirmed
-printing over the console. LCD pin assignments are still carried
+printing over the console (now at 38400 baud -- see point 1 below, not
+the originally-computed 115200). LCD pin assignments are still carried
 forward unverified from `f722ze-tiny`'s board file (no physical display
 has been wired to this board yet).
 
-Getting to that point surfaced two real, now-fixed hardware/toolchain
-issues, both worth knowing if this is ever rebuilt from scratch:
+Getting to that point surfaced two real hardware/toolchain issues, one
+fixed, one still open:
 
-1. **HSE needs bypass mode.** This board's HSE (until a real crystal is
-   populated at X3) is the ST-LINK's own actively-driven MCO output, not
-   a passive crystal -- but the stock runtime's `Setup_Pll` assumes a
-   passive crystal (`HSE_Bypass => False`). Left that way, the PLL
-   reports `HSERDY`/`PLLRDY` success the whole time, while the actual
-   achieved clock empirically locks at very close to 1/3 of the intended
-   frequency -- confirmed two independent ways on real hardware: UART
-   needing a terminal at 38400 instead of the computed ~115200, and
-   `Ada.Real_Time` ticking at 1/3 rate over a real, stopwatch-timed
-   30-second interval. Fixed via a second `gnat_user` override (see
-   `runtime-overrides/README.md`) setting `HSE_Bypass => True`. With that
-   fix in, the UART baud divisor should be re-verified at the originally
-   computed ~115200 rather than assumed still-correct at 38400.
+1. **Clock tree runs at ~1/3 of its configured target -- root cause
+   still unknown.** `RCC_CR`/`RCC_CFGR` report everything consistent
+   with the intended `PCLK1` = 50MHz (`HSERDY`/`PLLRDY` both set, `SW`/
+   `SWS` = PLL, correct prescalers), but the clock actually reaching
+   peripherals measures at very close to 1/3 of that -- confirmed two
+   independent ways on real hardware: UART needing a terminal at 38400
+   instead of the computed ~115200, and `Ada.Real_Time` ticking at 1/3
+   rate over a real, stopwatch-timed 30-second interval. A strong
+   candidate theory (`HSE_Bypass => True`, since this board's HSE is an
+   actively-driven ST-LINK MCO signal, not a passive crystal) was tried
+   and **disproven** by a real-hardware retest -- rebuilt with the fix
+   in, reflashed, still 38400. That change is left in place (harmless,
+   just not the fix) -- see `runtime-overrides/README.md` for the full
+   account. The actual, current workaround is at the symptom, not the
+   cause: `Bifrost.UART`'s `BRR` is set to target the *measured*
+   ~16.667MHz effective clock directly, documented as a patch, not a
+   fix, in that file's own comment. If the real root cause is ever
+   found, the BRR value needs to go back to targeting the true 50MHz,
+   and any `Ada.Real_Time`-driven timing should be re-checked too.
 2. **gdb's `load` can silently not write anything to flash.** If the
    `arm-eabi-gdb` bundled with the GNAT-FSF archive gets picked up ahead
    of the official ARM GNU Toolchain's `arm-none-eabi-gdb` (a PATH-order
@@ -434,15 +441,18 @@ issues, both worth knowing if this is ever rebuilt from scratch:
 ## Target Hardware
 
 NUCLEO-F767ZI (STMicroelectronics STM32F767ZI, Cortex-M7 with
-double-precision FPU). Two one-time toolchain steps beyond
-`../SETUP.md`, specific to this board -- see `runtime-overrides/README.md`
-for both: this board's actual 8MHz HSE (not the 25MHz the installed
-`light-tasking-stm32f769disco` profile assumes, calibrated instead for
-the unrelated STM32F769-Discovery board), and HSE bypass mode (since
-that HSE is an actively-driven MCO signal, not a passive crystal, until
-X3 is populated). Skipping either is not a build-time error -- the board
-comes up and even reports its PLL as locked successfully, just at the
-wrong clock, silently.
+double-precision FPU). Before building this tree for the first time on
+a given machine, one extra one-time toolchain step is required beyond
+`../SETUP.md`: run `make -f runtime-overrides/toolchain.mk` once to
+patch the installed `light-tasking-stm32f769disco` runtime with this
+board's actual clock constants (8MHz HSE, not the 25MHz the stock
+profile assumes -- calibrated instead for the unrelated
+STM32F769-Discovery board) and the `HSE_Bypass` setting. See
+`runtime-overrides/README.md` for the full explanation, including why
+a plain `gprbuild`/`buildw.sh` run cannot apply this on its own.
+Skipping this step is not a build-time error -- the board comes up and
+even reports its PLL as locked successfully, just at the wrong clock,
+silently.
 
 ## Architecture
 
@@ -471,7 +481,8 @@ plays for its board.
 ## Build
 
 Toolchain prerequisites: see `../SETUP.md`, plus the one-time
-`runtime-overrides/README.md` step above.
+`make -f runtime-overrides/toolchain.mk` step above (once per machine,
+before the first build of this tree).
 
 ```
 $ cd f767zi

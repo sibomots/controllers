@@ -18,11 +18,6 @@ environment for the Ada version of `bifrost`. Do these once per machine.
 Once done, see [`README.md`](README.md) for the actual build and debug
 workflow you'll use every day.
 
-(Historical note: this document supersedes [`INTRO.md`](INTRO.md)'s "Dev
-Environment" section, which referred to the now-discontinued GNAT
-Community installer. `INTRO.md` is kept as-is for background/reference,
-not as a setup guide.)
-
 ## Software Toolchain
 
 The toolchain to build and load the application is the GNAT Ada
@@ -204,10 +199,10 @@ general GNAT material) calls the minimal bare-metal runtime "ZFP"
 this archive under its current name.
 
 Which profile applies depends on which board you're building for --
-this toolchain serves **two** separate Ada projects in this repo
-(`f722ze-tiny` and `samv71-tiny`, see [`README.md`](README.md) for how
-they compare), each on a different board with a different level of
-runtime support:
+this toolchain serves **three** separate Ada projects in this repo
+(`f722ze-tiny`, `f767zi`, and `samv71-tiny`, see [`README.md`](README.md)
+for how they compare), each on a different board with a different
+level of runtime support:
 
 - **NUCLEO-F722ZE** (`f722ze-tiny`; C-only-in-a-pinch, see
   [`../HARDWARE.md`](../HARDWARE.md)): no out-of-box board-specific
@@ -218,15 +213,14 @@ runtime support:
   This is a *non-tasking* profile -- no `light-tasking-cortex-m7f`
   exists generically, and F722ZE has no board-specific tasking profile
   either (see below).
-- **NUCLEO-F767ZI** (the preferred board for `f722ze-tiny`'s future
-  tasking work, once Ada tasking is involved): its STM32F767ZI silicon
-  has a double-precision FPU (`cortex-m7df`), and -- unlike F722ZE --
-  it has a real match among the toolchain's board-specific
-  `light-tasking-*` profiles: `light-tasking-stm32f769disco`, built
-  for the STM32F769NI, which is memory-map-identical to the F767ZI's
-  STM32F767ZI (confirmed against ST's datasheets, not assumed). This
-  is the profile `f722ze-tiny`'s tasking phase will use once that
-  board is in hand -- not yet wired into that project.
+- **NUCLEO-F767ZI** (`f767zi`, the tasking-phase port, its own tree):
+  its STM32F767ZI silicon has a double-precision FPU (`cortex-m7df`),
+  and -- unlike F722ZE -- it has a real match among the toolchain's
+  board-specific `light-tasking-*` profiles: `light-tasking-stm32f769disco`,
+  built for the STM32F769NI, which is memory-map-identical to the
+  F767ZI's STM32F767ZI (confirmed against ST's datasheets, not
+  assumed). This profile needs one extra one-time patch step before
+  its first build -- see "One more one-time step, `f767zi` only" below.
 - **SAMV71 Xplained Ultra** (`samv71-tiny`): unlike either STM32
   board above, this one has a *genuine* board-specific GNAT BSP bundled
   in the toolchain -- three profiles exist (`embedded-samv71`,
@@ -242,11 +236,12 @@ runtime support:
 In order to flash and debug on target you need software that
 comprehends JTAG/SWD and GDB. Which tool depends on which project:
 
-- **`f722ze-tiny`** (NUCLEO-F722ZE): `openocd` talking to the
-  board's on-board ST-Link -- **identical requirement and identical
-  tool** to the C side. If you already set this up for the C build,
-  there is nothing new to install here; OpenOCD doesn't care what
-  compiler produced the ELF file it's flashing.
+- **`f722ze-tiny`** and **`f767zi`** (NUCLEO-F722ZE / NUCLEO-F767ZI):
+  `openocd` talking to the board's on-board ST-Link -- **identical
+  requirement and identical tool** to the C side, and the same for
+  both boards. If you already set this up for the C build, there is
+  nothing new to install here; OpenOCD doesn't care what compiler
+  produced the ELF file it's flashing.
 
   ```
   $ pacman -Syu mingw-w64-x86_64-openocd
@@ -264,6 +259,25 @@ comprehends JTAG/SWD and GDB. Which tool depends on which project:
   own `setupw.sh` exactly (`c/samv71-tiny/main/setupw.sh`) -- same
   physical board, same debugger, regardless of which language built
   the image being debugged.
+
+## One more one-time step, `f767zi` only
+
+`f722ze-tiny` and `samv71-tiny` are ready to build as soon as the steps
+above are done. `f767zi` needs one additional one-time step before its
+first build on a given machine: its runtime (`light-tasking-stm32f769disco`)
+ships calibrated for a different board's crystal, and a plain
+`gprbuild`/`buildw.sh` run cannot patch that on its own. From
+`f767zi/`:
+
+```
+$ make -f runtime-overrides/toolchain.mk
+```
+
+(Edit `GNAT_PREFIX` near the top of that file first if your toolchain
+isn't installed at the default path it assumes.) See
+[`f767zi/runtime-overrides/README.md`](f767zi/runtime-overrides/README.md)
+for what this actually does and why. Safe to re-run; only needs
+running once per machine unless that directory's contents change.
 
 With this done, you're set up. Move on to [`README.md`](README.md) for
 the actual build and debug workflow for whichever project you're

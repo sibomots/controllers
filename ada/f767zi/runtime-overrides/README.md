@@ -62,36 +62,48 @@ build of this project would keep failing at bind ("X must be recompiled")
 forever. `toolchain.mk` (see below) is what actually makes this work --
 not a convenience, the only thing that does.
 
-## A second issue: HSE bypass mode
+## A second issue: an unexplained ~1/3 clock undershoot (open)
 
-`setup_pll.adb` itself (not just the board-parameter constants above)
-needed a change too, found only once real hardware was in hand and
-behaving strangely in a way no register inspection explained at first.
-The stock file hardcodes `HSE_Bypass : constant Boolean := False` --
-telling the chip to drive its own crystal-oscillator amplifier circuit,
-which expects a passive resonator completing a feedback loop. But this
-board's HSE -- at least until an actual crystal is populated at X3 --
-comes from the ST-LINK's own MCO output: an *actively*-driven digital
-clock signal, not a passive crystal. Feeding that into a non-bypass
-oscillator circuit is a real, known failure mode: the amplifier can
-lock onto a parasitic subharmonic of the drive signal instead of
-tracking it.
+Real hardware behaves strangely in a way no register inspection
+explains: `RCC_CR`/`RCC_CFGR` report `HSERDY`/`PLLRDY` both set, `SW`/
+`SWS` = PLL, `HPRE` = /1, `PPRE1` = /4 -- every register consistent
+with the intended `PCLK1` = 50MHz. But the clock actually reaching
+peripherals measures at very close to 1/3 of that, confirmed two
+independent ways on real hardware: the UART needs a terminal set to
+38400 instead of the ~115200 the `BRR` math targets for 50MHz, and
+`Ada.Real_Time` measured against a real, stopwatch-timed 30-second
+interval ticks at almost exactly 1/3 the intended rate. Both land on
+the same ratio. `HSERDY`/`PLLRDY` only confirm the oscillator
+*stabilized* at something, not that it stabilized at the right
+frequency, which is why register-reading alone didn't catch this.
 
-That's exactly what was happening, confirmed two independent ways on
-real hardware, not guessed: UART needed a terminal set to 38400 instead
-of the ~115200 the `BRR` math targeted, and `Ada.Real_Time` measured
-against a real, stopwatch-timed 30-second interval ticked at almost
-exactly 1/3 the intended rate. Both land on the same ratio.
-`HSERDY`/`PLLRDY` both reported success the whole time -- they only
-confirm the oscillator *stabilized* at something, not that it
-stabilized at the right frequency, which is why register-reading alone
-didn't catch this; only an actual time-domain measurement did.
+**A disproven theory, kept for the record so it isn't retried blind:**
+this board's HSE -- until a real crystal is populated at X3 -- comes
+from the ST-LINK's own MCO output, an *actively*-driven digital clock
+signal, not a passive crystal. The stock `setup_pll.adb` hardcodes
+`HSE_Bypass : constant Boolean := False`, which configures the chip's
+crystal-oscillator amplifier circuit -- feeding an actively-driven
+signal into that circuit instead of bypass mode is a real, known
+failure mode (the amplifier can lock onto a parasitic subharmonic of
+the drive signal). This looked like a strong candidate fix and was
+applied (`gnat_user/setup_pll.adb` here sets `HSE_Bypass => True`), but
+**real-hardware retest after this fix disproved it**: rebuilt with the
+fix in place, reflashed, still 38400 baud -- no change at all. The
+`HSE_Bypass => True` change is left in place (not reverted, since it
+isn't shown to be harmful either), but it is not the fix, and the real
+root cause of the 1/3 undershoot is still unknown.
 
-`gnat_user/setup_pll.adb` here is the stock runtime file with exactly
-one constant changed: `HSE_Bypass => True`. If a real passive crystal
-is ever populated at X3 instead of relying on the ST-LINK MCO, this
-needs to be flipped back to `False` -- bypass mode is for actively
-driven external clock sources, not passive resonators.
+**Current workaround, applied where it's actually needed:**
+`lowlevel/src/bifrost-uart.adb`'s `USART3_Periph.BRR` is set to target
+the *measured* ~16.667MHz (50MHz/3) effective clock directly
+(`Mantissa=9, Fraction=1, BRR=145`) rather than the theoretical 50MHz
+value (`Mantissa=27, Fraction=2, BRR=434`) -- a symptom-level patch,
+not a fix, documented as such in that file's own comment. If the real
+root cause is ever found and fixed upstream (in the clock tree itself,
+not here), the BRR value needs to go back to targeting the true 50MHz,
+and `Ada.Real_Time`-driven timing elsewhere in this port should be
+re-checked too, since it rides the same clock tree and would also be
+running 3x faster than intended once the real fix lands.
 
 ## Install step
 

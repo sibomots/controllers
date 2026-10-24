@@ -15,10 +15,13 @@
 
 This page covers the **one-time** steps to prepare a build/flash/debug
 environment for the C projects in this directory -- `f722ze-tiny`
-(`bifrost`) and `samv71-tiny`, which share the same ARM GCC toolchain
-and shell setup below. Do these once per machine. Once done, see
-[`README.md`](README.md) for the actual build and debug workflow you'll
-use every day, for whichever project you're working on.
+(`bifrost`), `f767zi` (the same `bifrost` application on NUCLEO-F767ZI),
+and `samv71-tiny`, all of which share the same ARM GCC toolchain and
+shell setup below (`f767zi` needs no additional toolchain step beyond
+what's here, unlike the Ada side -- see [`../ada/SETUP.md`](../ada/SETUP.md)).
+Do these once per machine. Once done, see [`README.md`](README.md) for
+the actual build and debug workflow you'll use every day, for whichever
+project you're working on.
 
 ## Software Toolchain
 
@@ -215,9 +218,10 @@ $ pacman -Syu mingw-w64-x86_64-cmake mingw-w64-x86_64-make
 In order to flash and debug on target you will need software that
 comprehends JTAG/SWD and GDB. Which tool depends on which project:
 
-- **`f722ze-tiny`** (NUCLEO-F722ZE): the open source solution to this
-  is `openocd`, talking to the board's on-board ST-Link. See below for
-  the full walkthrough.
+- **`f722ze-tiny`** and **`f767zi`** (NUCLEO-F722ZE / NUCLEO-F767ZI):
+  the open source solution to this is `openocd`, talking to the
+  board's on-board ST-Link -- identical steps for both boards. See
+  below for the full walkthrough.
 - **`samv71-tiny`** (SAMV71 Xplained Ultra): a genuinely different
   debug chain -- **SEGGER J-Link**, not OpenOCD/ST-Link. Install the
   J-Link Software and Documentation Pack from SEGGER
