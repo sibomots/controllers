@@ -64,7 +64,7 @@ static uint8_t tm_welcome[] = "\r\n\r\n"
 "This is TinyMon\r\n"
 TM_PLATFORM_DESC "\r\n"
 "Version " TM_SOFTWARE_VERSION "\r\n"
-TM_LICENSE_TEXT "\r\n"
+TM_LICENSE_TEXT "\r\n\r\n"
 "Type 'help' for more information.\r\n"
 "\r\n";
 

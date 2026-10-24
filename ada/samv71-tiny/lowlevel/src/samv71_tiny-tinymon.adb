@@ -63,7 +63,7 @@ package body Samv71_Tiny.TinyMon is
      "This is TinyMon" & ASCII.CR & ASCII.LF &
      Platform_Desc & ASCII.CR & ASCII.LF &
      "Version " & Software_Version & ASCII.CR & ASCII.LF &
-     License_Text & ASCII.CR & ASCII.LF &
+     License_Text & ASCII.CR & ASCII.LF & ASCII.CR & ASCII.LF &
      "Type 'help' for more information." & ASCII.CR & ASCII.LF &
      ASCII.CR & ASCII.LF;
 

@@ -127,9 +127,17 @@ package body Bifrost.UART is
    procedure Put (Item : Character) is
       Next : constant TX_Index_T := TX_Head + 1;
    begin
-      if Next = TX_Tail then
-         return; -- ring full; drop rather than block (see spec note)
-      end if;
+      while Next = TX_Tail loop
+         -- Ring full -- wait for Interrupt_Handler to drain a slot
+         -- rather than drop the byte (a longer message than the ring
+         -- can hold at once must still arrive intact). TXEIE has to be
+         -- enabled for the ISR to run at all; enabling it
+         -- unconditionally here also covers the case where this is the
+         -- very first byte ever queued. Safe to spin here: nothing
+         -- disables interrupts around this call, so Interrupt_Handler
+         -- keeps firing and advancing TX_Tail while this loop waits.
+         USART3_CR1 := USART3_CR1 or TXEIE_BIT;
+      end loop;
       TX_Buf (TX_Head) := Item;
       TX_Head := Next;
       USART3_CR1 := USART3_CR1 or TXEIE_BIT;

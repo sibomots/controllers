@@ -168,7 +168,7 @@ void tinymon_init(void)
     put_string("\r\n\r\nThis is TinyMon\r\n"
                PLATFORM_DESC "\r\n"
                "Version " SOFTWARE_VERSION "\r\n"
-               LICENSE_TEXT "\r\n"
+               LICENSE_TEXT "\r\n\r\n"
                "Type 'help' for more information.\r\n\r\n");
     show_prompt();
 }
