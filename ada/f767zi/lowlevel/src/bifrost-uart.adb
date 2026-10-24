@@ -142,21 +142,37 @@ package body Bifrost.UART is
          Val      => (GPIOD_Periph.AFRH.Val and not 16#0000_00FF#)
                       or 16#0000_0077#);
 
-      -- 115200 baud at PCLK1 = 50MHz (HCLK/4 -- see System.BB.Parameters'
-      -- APB1_PRE -- with HCLK = SYSCLK = 200MHz, AHB_PRE = DIV1). "New"
-      -- F7 USART IP, 16x oversampling (OVER8 left at its reset value of
-      -- 0 by not setting it in CR1 below): USARTDIV = PCLK1/(16*Baud) =
-      -- 50_000_000/1_843_200 = 27.127(..), giving Mantissa=27,
-      -- Fraction=round(0.127*16)=2 -- BRR = 27*16+2 = 434. Actual baud
-      -- produced: 50_000_000/(16*27.125) = 115_207Hz, 0.0064% off
-      -- nominal -- well within the UART's own tolerance. Needs the same
-      -- oscilloscope/real-hardware confirmation flagged in
-      -- ../../../KNOWN_ISSUES.md for SysTick timing once F767ZI is
-      -- actually in hand -- PCLK1's own correctness depends on the HSE
-      -- override in ../runtime-overrides/ being installed into the
-      -- toolchain first.
+      -- BRR targets a MEASURED clock, not the theoretical one. The
+      -- clock tree's own registers (RCC_CR, RCC_CFGR) report PLLRDY=1,
+      -- HSERDY=1, SW/SWS=PLL, HPRE=/1, PPRE1=/4 -- all consistent with
+      -- the intended PCLK1 = 50MHz (HCLK/4, HCLK = SYSCLK = 200MHz).
+      -- But the ACTUAL clock reaching this peripheral measures at very
+      -- close to 1/3 of that -- confirmed on real hardware two
+      -- independent ways: the UART needs a terminal at 38400 instead of
+      -- a BRR computed for 115200 at 50MHz, and Ada.Real_Time (which
+      -- rides the same clock tree) ticked at 1/3 rate over a real,
+      -- stopwatch-timed 30-second interval. Setting HSE_Bypass => True
+      -- (../../runtime-overrides/gnat_user/setup_pll.adb) was tried as
+      -- a fix for this on the theory that an actively-driven HSE source
+      -- needed bypass mode -- confirmed on real hardware NOT to change
+      -- the result at all (same 1/3 undershoot either way), so that
+      -- theory is wrong, or at least not the operative mechanism here.
+      -- Root cause of the 1/3 factor itself is still open. This BRR
+      -- value targets the measured ~16.667MHz (50MHz/3) effective
+      -- clock directly, rather than the theoretical 50MHz, since the
+      -- effect is 100% reproducible even though the upstream cause
+      -- isn't pinned down yet: USARTDIV = 16_666_667/1_843_200 =
+      -- 9.0422(..), giving Mantissa=9, Fraction=round(0.0422*16)=1 --
+      -- BRR = 9*16+1 = 145. Actual baud produced:
+      -- 16_666_667/(16*9.0625) = 114_943Hz, 0.22% off nominal --
+      -- within the UART's tolerance. If the real root cause of the 1/3
+      -- factor is ever found and fixed upstream (in the clock tree
+      -- itself, not here), this will need to go back to targeting the
+      -- true 50MHz value (Mantissa=27, Fraction=2, BRR=434) -- don't
+      -- carry this measured-clock value forward blindly if the
+      -- upstream clock behavior ever changes.
       USART3_Periph.BRR :=
-        (DIV_Fraction => 2, DIV_Mantissa => 27, Reserved_16_31 => 0);
+        (DIV_Fraction => 1, DIV_Mantissa => 9, Reserved_16_31 => 0);
 
       -- UE + TE + RE + RXNEIE. TXEIE is enabled on demand by Put/Handler
       -- above, same as f722ze-tiny's Bifrost.UART.
