@@ -20,17 +20,39 @@ package body Bifrost.TinyMon is
 
    Prompt : constant String := ASCII.CR & ASCII.LF & "TinyMon> ";
 
+   Platform_Desc : constant String := "NUCLEO-F722ZE (STM32F722ZE)";
+
+   -- Hand-edit this on each release. Deliberately not derived from the
+   -- git commit SHA -- a build can't know the SHA of the commit that
+   -- will contain it, and a plain string avoids that chicken-and-egg
+   -- problem entirely.
+   Software_Version : constant String := "0.1.0";
+
+   License_Text : constant String :=
+     "Copyright (c) 2025 Jeff Wandling. All rights reserved. | " &
+     "BSD 3-Clause License";
+
    Welcome : constant String :=
      ASCII.CR & ASCII.LF & ASCII.CR & ASCII.LF &
      "This is TinyMon" & ASCII.CR & ASCII.LF &
+     Platform_Desc & ASCII.CR & ASCII.LF &
+     "Version " & Software_Version & ASCII.CR & ASCII.LF &
+     License_Text & ASCII.CR & ASCII.LF &
      "Type 'help' for more information." & ASCII.CR & ASCII.LF &
      ASCII.CR & ASCII.LF;
 
    Help_Text : constant String :=
      ASCII.CR & ASCII.LF & ASCII.LF &
+     Platform_Desc & ASCII.CR & ASCII.LF &
+     "Version " & Software_Version & ASCII.CR & ASCII.LF &
+     License_Text & ASCII.CR & ASCII.LF & ASCII.LF &
      "Available commands:" & ASCII.CR & ASCII.LF &
      "help" & ASCII.CR & ASCII.LF &
-     "count" & ASCII.CR & ASCII.LF;
+     "count" & ASCII.CR & ASCII.LF &
+     "license" & ASCII.CR & ASCII.LF;
+
+   License_Reply : constant String :=
+     ASCII.CR & ASCII.LF & License_Text & ASCII.CR & ASCII.LF;
 
    Unknown_Text : constant String :=
      ASCII.CR & ASCII.LF & "unknown command" & ASCII.CR & ASCII.LF;
@@ -69,6 +91,11 @@ package body Bifrost.TinyMon is
       Put_String (Help_Text);
    end Show_Help;
 
+   procedure Show_License is
+   begin
+      Put_String (License_Reply);
+   end Show_License;
+
    procedure Show_Count is
       Count_Buf : String (1 .. Bifrost.LCD_Config.LCD_Max_Col);
       Length    : Natural;
@@ -91,6 +118,8 @@ package body Bifrost.TinyMon is
          Show_Help;
       elsif Line = "count" then
          Show_Count;
+      elsif Line = "license" then
+         Show_License;
       else
          Put_String (Unknown_Text);
       end if;

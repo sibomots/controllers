@@ -27,9 +27,27 @@ static const uint8_t standby_str[] = "STANDBY";
 static const uint8_t tm_prompt[] = "\r\nTinyMon> ";
 static const int tm_prompt_sz = sizeof(tm_prompt) - 1;
 
-static const uint8_t tm_help_dialogue[] = "\r\n\nEnter one of the following "
+#define TM_PLATFORM_DESC "SAMV71 Xplained Ultra (ATSAMV71Q21B)"
+
+/* Hand-edit this on each release. Deliberately not derived from the
+ * git commit SHA -- a build can't know the SHA of the commit that will
+ * contain it, and a plain string avoids that chicken-and-egg problem
+ * entirely. */
+#define TM_SOFTWARE_VERSION "0.1.0"
+
+#define TM_LICENSE_TEXT \
+    "Copyright (c) 2025 Jeff Wandling. All rights reserved. | BSD 3-Clause License"
+
+static const uint8_t tm_help_dialogue[] = "\r\n\n" TM_PLATFORM_DESC "\r\n"
+                                          "Version " TM_SOFTWARE_VERSION "\r\n"
+                                          TM_LICENSE_TEXT "\r\n\n"
+                                          "Enter one of the following "
                                           "commands and its parameters:\r\ncmda\r\ncmdb led_id (0 <= led_id <= 1)"
-                                          "\r\ncmdc led_id (0 <= led_id <= 1)\r\n\ni.e. cmdb 1\r\n";
+                                          "\r\ncmdc led_id (0 <= led_id <= 1)\r\nlicense\r\n\ni.e. cmdb 1\r\n";
+
+static const uint8_t tm_license_reply[] = "\r\n" TM_LICENSE_TEXT "\r\n";
+static const int tm_license_reply_sz = sizeof(tm_license_reply) - 1;
+
 static const uint8_t tm_bs_sequence[] = { BS, SP, BS };
 static const uint8_t tm_sp_sequence[] = { SP };
 static const uint8_t tm_crlf_sequence[] = { CR, LF };
@@ -38,11 +56,15 @@ static const int tm_bs_sequence_sz = 3;
 static const int tm_sp_sequence_sz = 1;
 
 static uint8_t tm_help_flag = 0;
+static uint8_t tm_license_flag = 0;
 static uint8_t tm_print_flag = 0;
 static uint8_t tm_success_flag = 0;
 
 static uint8_t tm_welcome[] = "\r\n\r\n"
 "This is TinyMon\r\n"
+TM_PLATFORM_DESC "\r\n"
+"Version " TM_SOFTWARE_VERSION "\r\n"
+TM_LICENSE_TEXT "\r\n"
 "Type 'help' for more information.\r\n"
 "\r\n";
 
@@ -266,6 +288,10 @@ static void dispatch_cmd()
     {
         tm_help_flag = 1;
     }
+    else if (my_strcmp("license", (const char *)tm_buffer))
+    {
+        tm_license_flag = 1;
+    }
     else
     {
         for (int i = 0; i < NUM_CMDS; i++)
@@ -405,6 +431,13 @@ void print_user_messages()
     {
         Print(tm_help_dialogue, sizeof(tm_help_dialogue) - 1);
         tm_help_flag = 0;
+        clear_buffer();
+        show_prompt();
+    }
+    else if (tm_license_flag)
+    {
+        Print(tm_license_reply, tm_license_reply_sz);
+        tm_license_flag = 0;
         clear_buffer();
         show_prompt();
     }

@@ -20,6 +20,17 @@
 #define DEL (0x7F)
 #define CR ('\r')
 
+#define PLATFORM_DESC "NUCLEO-F767ZI (STM32F767ZI)"
+
+/* Hand-edit this on each release. Deliberately not derived from the
+ * git commit SHA -- a build can't know the SHA of the commit that
+ * will contain it, and a plain string avoids that chicken-and-egg
+ * problem entirely. */
+#define SOFTWARE_VERSION "0.1.0"
+
+#define LICENSE_TEXT \
+    "Copyright (c) 2025 Jeff Wandling. All rights reserved. | BSD 3-Clause License"
+
 static char buffer[BUF_SIZE];
 static unsigned int idx = 0;
 
@@ -48,7 +59,15 @@ static void show_prompt(void)
 
 static void show_help(void)
 {
-    put_string("\r\n\nAvailable commands:\r\nhelp\r\ncount\r\n");
+    put_string("\r\n\n" PLATFORM_DESC "\r\n"
+               "Version " SOFTWARE_VERSION "\r\n"
+               LICENSE_TEXT "\r\n\n"
+               "Available commands:\r\nhelp\r\ncount\r\nlicense\r\n");
+}
+
+static void show_license(void)
+{
+    put_string("\r\n" LICENSE_TEXT "\r\n");
 }
 
 static void show_count(void)
@@ -86,6 +105,8 @@ static void dispatch_cmd(void)
         show_help();
     } else if (cmd_is("count")) {
         show_count();
+    } else if (cmd_is("license")) {
+        show_license();
     } else {
         put_string("\r\nunknown command\r\n");
     }
@@ -144,6 +165,10 @@ void tinymon_poll(void)
 void tinymon_init(void)
 {
     usart3_init();
-    put_string("\r\n\r\nThis is TinyMon\r\nType 'help' for more information.\r\n\r\n");
+    put_string("\r\n\r\nThis is TinyMon\r\n"
+               PLATFORM_DESC "\r\n"
+               "Version " SOFTWARE_VERSION "\r\n"
+               LICENSE_TEXT "\r\n"
+               "Type 'help' for more information.\r\n\r\n");
     show_prompt();
 }
