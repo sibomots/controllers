@@ -1,0 +1,83 @@
+-- ============================================================================
+-- This file is part of Bifrost
+--
+-- Copyright (c) 2025 Jeff Wandling
+-- All Rights Reserved.
+--
+-- Licensed under BSD 3-Clause
+-- Redistribution and use in source and binary forms, with or without
+-- modification, are permitted under the terms of the BSD 3-Clause license.
+-- See the LICENSE file for the full text.
+-- ============================================================================
+
+-- Ada port of Bifrost for the NUCLEO-F767ZI, with real Ravenscar tasking
+-- (Main/LCD_Sink/UART_Sink -- see ../SOFTWARE.md) -- the tasking phase
+-- ../f722ze-tiny/ was blocked on, per ../../HARDWARE.md. This is a
+-- separate top-level tree from f722ze-tiny, not a board variant of it
+-- (same reasoning samv71-tiny is its own tree rather than a board
+-- variant of f722ze-tiny): the architecture here is different in kind,
+-- not just in register addresses -- a protected-object UART driver with
+-- a real interrupt attach instead of a hand-extended vector table, no
+-- hand-written startup/Reset_Handler at all, and two application tasks
+-- instead of one polled super-loop.
+--
+-- Like samv71_tiny.gpr, there is no Board_Kind scenario variable here --
+-- this tree targets exactly one board, so there is no second board's
+-- directory to structurally exclude.
+--
+-- Selecting "light-tasking-stm32f769disco" below pulls in, via that
+-- runtime's own runtime.xml, *required* compiler switches (-mcpu/-mfpu/
+-- -mfloat-abi) and *required* linker switches (runtime adalib path, and
+-- -T pointing at the runtime's own bundled linker script) unconditionally
+-- -- none of that is specified here, same as samv71_tiny.gpr's own
+-- Compiler/Linker packages. See ../../HARDWARE.md for why this profile
+-- (built for the STM32F769NI) is the right fit for F767ZI's STM32F767ZI,
+-- and runtime-overrides/README.md for the one-time toolchain step this
+-- board's actual 8MHz HSE requires before the runtime's own clock
+-- bring-up (Setup_Pll) will compute the right PLL configuration.
+project Bifrost is
+
+   for Target use "arm-eabi";
+   for Runtime ("Ada") use "light-tasking-stm32f769disco";
+
+   for Source_Dirs use
+     ("app/src",
+      "behavioral/src",
+      "lowlevel/src");
+
+   for Object_Dir use "obj";
+   for Exec_Dir use "bin";
+   for Main use ("main.adb");
+
+   package Builder is
+      -- Same renaming convention as f722ze-tiny/samv71-tiny: gprbuild's
+      -- default output name follows the Main source file's base name
+      -- ("main"), not the project name.
+      for Executable ("main.adb") use "bifrost.elf";
+   end Builder;
+
+   package Compiler is
+      for Default_Switches ("Ada") use
+        ("-g",
+         "-ffunction-sections",
+         "-fdata-sections");
+
+      -- Same accepted-risk rationale as samv71_tiny.gpr's own Compiler
+      -- package: depending on Interfaces.STM32.* triggers GNAT's
+      -- "internal GNAT unit"/"non-portable and version-dependent"
+      -- warning. Scoped to exactly the files that touch it, not
+      -- blanket-silenced -- see samv71_tiny.gpr for the full rationale,
+      -- unchanged here beyond which files it applies to.
+      for Switches ("bifrost-uart.adb") use
+        Compiler'Default_Switches ("Ada") & ("-gnatwI");
+      for Switches ("bifrost-lcd.adb") use
+        Compiler'Default_Switches ("Ada") & ("-gnatwI");
+   end Compiler;
+
+   package Linker is
+      for Default_Switches ("Ada") use
+        ("-Wl,--gc-sections",
+         "-Wl,-Map," & Project'Project_Dir & "bin/bifrost.map");
+   end Linker;
+
+end Bifrost;

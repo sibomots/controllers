@@ -47,7 +47,15 @@ protected-object pattern a Ravenscar runtime would normally provide.
 It's a real, working alternative for interrupt-driven I/O specifically
 -- it does not provide task scheduling, rendezvous, or any of the rest
 of what Ravenscar tasking would bring, so the three-task design above
-is still blocked exactly as described.
+is still blocked exactly as described, *for this tree*.
+
+The three-task design itself is no longer blocked overall -- it lives
+in `ada/f767zi/`, a separate tree targeting NUCLEO-F767ZI with the real
+`light-tasking-stm32f769disco` Ravenscar runtime (see
+[`HARDWARE.md`](HARDWARE.md) and
+[`ada/README.md`](ada/README.md#f767zi-nucleo-f767zi)). `ada/f722ze-tiny/`
+itself is not being migrated to tasking -- this remains an accurate,
+current description of that specific tree, not a stale one.
 
 ## 2. Why NUCLEO-F722ZE can't host that design
 

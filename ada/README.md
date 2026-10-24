@@ -26,30 +26,33 @@ shared by both projects below. There is also a
 [Software Design Document](SOFTWARE.md) here that explains the
 architecture of both.</i>
 
-## Two ports, two boards, two very different Ada stories
+## Three ports, three boards
 
-|  | [`f722ze-tiny`](#f722ze-tiny-nucleo-f722ze) | [`samv71-tiny`](#samv71-tiny-samv71-xplained-ultra) |
-|---|---|---|
-| Board | NUCLEO-F722ZE (STM32F722ZET6) | SAMV71 Xplained Ultra (ATSAMV71Q21B) |
-| Internal name | `Bifrost` (`bifrost.gpr`) | `Samv71_Tiny` (`samv71_tiny.gpr`) |
-| GNAT runtime | `light-cortex-m7f` -- generic, non-tasking | `light-tasking-samv71` -- real board-specific Ravenscar BSP |
-| Tasking | none available for this board at all | real: protected objects, a library-level console `task` |
-| Interrupt-driven I/O | yes, but hand-rolled (extended vector table + plain ISR procedure + lock-free ring buffers) | yes, idiomatic Ravenscar (`pragma Attach_Handler`, protected entries) |
-| Vector table / startup | hand-written (`Bifrost.Startup`) -- no board BSP exists | supplied by the runtime's own `start-rom.S` -- nothing to hand-write |
-| Debug probe | ST-Link (OpenOCD) | SEGGER J-Link |
-| Status | LCD counter demo + TinyMon console, no tasking phase (blocked on F767ZI) | all 6 planned phases complete and verified |
+|  | [`f722ze-tiny`](#f722ze-tiny-nucleo-f722ze) | [`f767zi`](#f767zi-nucleo-f767zi) | [`samv71-tiny`](#samv71-tiny-samv71-xplained-ultra) |
+|---|---|---|---|
+| Board | NUCLEO-F722ZE (STM32F722ZET6) | NUCLEO-F767ZI (STM32F767ZI) | SAMV71 Xplained Ultra (ATSAMV71Q21B) |
+| Internal name | `Bifrost` (`bifrost.gpr`) | `Bifrost` (`bifrost.gpr`) | `Samv71_Tiny` (`samv71_tiny.gpr`) |
+| GNAT runtime | `light-cortex-m7f` -- generic, non-tasking | `light-tasking-stm32f769disco` -- board-specific Ravenscar BSP (F769NI-targeted, memory-map-identical to F767ZI -- see `../HARDWARE.md`) | `light-tasking-samv71` -- real board-specific Ravenscar BSP |
+| Tasking | none available for this board at all | real: protected objects, two library-level tasks (`LCD_Sink`, `UART_Sink`) | real: protected objects, a library-level console `task` |
+| Interrupt-driven I/O | yes, but hand-rolled (extended vector table + plain ISR procedure + lock-free ring buffers) | yes, idiomatic Ravenscar (`pragma Attach_Handler`, protected entries) | yes, idiomatic Ravenscar (`pragma Attach_Handler`, protected entries) |
+| Vector table / startup | hand-written (`Bifrost.Startup`) -- no board BSP exists | supplied by the runtime's own `start-rom.S` -- nothing to hand-write | supplied by the runtime's own `start-rom.S` -- nothing to hand-write |
+| Debug probe | ST-Link (OpenOCD) | ST-Link (OpenOCD) | SEGGER J-Link |
+| Status | LCD counter demo + TinyMon console, no tasking (this is the tree that stays that way -- see `f767zi` for the tasking phase) | LCD counter demo + TinyMon console with real Main/`LCD_Sink`/`UART_Sink` tasking (`../SOFTWARE.md`); compiles and binds clean against the real toolchain, not yet run on actual hardware | all 6 planned phases complete and verified |
 
 The short version: `f722ze-tiny` is what this Ada effort started on, and
 it's a real, working bare-metal Ada program -- but the board itself has
 no Ravenscar tasking support at all in the installed toolchain, so
 everything on it (including its interrupt-driven UART) is built the
-hard way, without language-level concurrency. `samv71-tiny` is a later,
-second Ada port, deliberately chosen because the SAMV71 Xplained Ultra
-*does* have a real, board-specific Ravenscar BSP bundled in the
-toolchain -- so it gets to show what the same kind of problem
-(interrupt-driven, bidirectional console I/O) looks like with actual
-Ada tasking available, as a direct, verified contrast to `f722ze-tiny`'s
-approach on the same class of problem.
+hard way, without language-level concurrency, and it stays that way --
+it is not getting a tasking phase of its own. `f767zi` is that tasking
+phase, as its own top-level tree rather than a board variant of
+`f722ze-tiny` (same reasoning `samv71-tiny` is its own tree): once a
+real Ravenscar runtime is involved, the architecture differs in kind,
+not just in register addresses. `samv71-tiny` is a separate, earlier Ada
+port on unrelated silicon, included here because the SAMV71 Xplained
+Ultra's own board-specific Ravenscar BSP let it demonstrate the same
+*kind* of interrupt-driven-tasking architecture well before an
+F767ZI was in hand to build `f767zi` against.
 
 # f722ze-tiny (NUCLEO-F722ZE)
 
@@ -376,6 +379,138 @@ via the pure-Ada `Reset_Handler`/vector table in
 `lowlevel/src/bifrost-startup.adb`, running through the GNAT-generated
 `main`/`adainit` chain documented above, and transmitting real
 characters out the hand-rolled `Bifrost.UART` driver.
+
+# f767zi (NUCLEO-F767ZI)
+
+This is the tasking-phase Ada port of `bifrost` -- the Main/`LCD_Sink`/
+`UART_Sink` architecture `../SOFTWARE.md` planned and `f722ze-tiny`
+above was blocked on (see `../HARDWARE.md`). Same internal identity as
+`f722ze-tiny` (`Bifrost`, `bifrost.gpr`, `bifrost.elf`) -- this is a
+different top-level directory for the same application, not a
+different one, same relationship as `f722ze-tiny`'s own directory
+rename from the C tree's naming.
+
+## Status
+
+Running on real hardware: `Main` reaches `Bifrost.UART.Initialize`
+(confirmed by reading `USART3.CR1` directly over SWD, not by trusting
+any single tool), and the TinyMon welcome banner/prompt is confirmed
+printing over the console. LCD pin assignments are still carried
+forward unverified from `f722ze-tiny`'s board file (no physical display
+has been wired to this board yet).
+
+Getting to that point surfaced two real, now-fixed hardware/toolchain
+issues, both worth knowing if this is ever rebuilt from scratch:
+
+1. **HSE needs bypass mode.** This board's HSE (until a real crystal is
+   populated at X3) is the ST-LINK's own actively-driven MCO output, not
+   a passive crystal -- but the stock runtime's `Setup_Pll` assumes a
+   passive crystal (`HSE_Bypass => False`). Left that way, the PLL
+   reports `HSERDY`/`PLLRDY` success the whole time, while the actual
+   achieved clock empirically locks at very close to 1/3 of the intended
+   frequency -- confirmed two independent ways on real hardware: UART
+   needing a terminal at 38400 instead of the computed ~115200, and
+   `Ada.Real_Time` ticking at 1/3 rate over a real, stopwatch-timed
+   30-second interval. Fixed via a second `gnat_user` override (see
+   `runtime-overrides/README.md`) setting `HSE_Bypass => True`. With that
+   fix in, the UART baud divisor should be re-verified at the originally
+   computed ~115200 rather than assumed still-correct at 38400.
+2. **gdb's `load` can silently not write anything to flash.** If the
+   `arm-eabi-gdb` bundled with the GNAT-FSF archive gets picked up ahead
+   of the official ARM GNU Toolchain's `arm-none-eabi-gdb` (a PATH-order
+   accident, not a deliberate choice), it lacks libexpat/XML support --
+   visible as "Can not parse XML target description/memory map" at every
+   connect. That's not cosmetic: `load` needs the XML memory map to know
+   an address range is flash and route the write through OpenOCD's real
+   flash-programming algorithm; without it, `load` sends plain memory
+   writes that silently have no effect on actual flash content, while
+   still printing normal-looking "Loading section..." success output.
+   `setupw.sh` now prefers `arm-none-eabi-gdb` for this reason. If `load`
+   ever looks successful but a fresh `mdw 0x08000000` (via OpenOCD's
+   telnet console, port 4444) still reads `ffffffff`, flash with
+   OpenOCD's own `program bin/bifrost.elf verify reset` command instead
+   of gdb's `load`.
+
+## Target Hardware
+
+NUCLEO-F767ZI (STMicroelectronics STM32F767ZI, Cortex-M7 with
+double-precision FPU). Two one-time toolchain steps beyond
+`../SETUP.md`, specific to this board -- see `runtime-overrides/README.md`
+for both: this board's actual 8MHz HSE (not the 25MHz the installed
+`light-tasking-stm32f769disco` profile assumes, calibrated instead for
+the unrelated STM32F769-Discovery board), and HSE bypass mode (since
+that HSE is an actively-driven MCO signal, not a passive crystal, until
+X3 is populated). Skipping either is not a build-time error -- the board
+comes up and even reports its PLL as locked successfully, just at the
+wrong clock, silently.
+
+## Architecture
+
+Real Ravenscar tasking, same idiomatic pattern `samv71-tiny` already
+proved out on different silicon: `Bifrost.UART`'s protected object owns
+USART3's TX/RX ring buffers and interrupt handler
+(`pragma Attach_Handler`), with blocking `Put`/`Get` as protected
+entries; `Bifrost.TinyMon`'s `UART_Sink` task blocks on `Get` and
+dispatches each byte as it arrives; `Bifrost.LCD_Sink`'s own task owns
+the LCD counter display end to end (bring-up, splash, and the recurring
+periodic update) -- deliberately the *only* task that ever touches
+`Bifrost.LCD_Control`, since that driver has no protected object of its
+own and two tasks bit-banging the same HD44780 interface concurrently
+would corrupt it. `Main` does one-time USART3 bring-up and the welcome
+banner, then parks -- both tasks are already running by the time its
+first statement executes (standard Ravenscar library-level task
+activation order).
+
+Unlike `f722ze-tiny`, this board's runtime bundles a real SVD-generated
+BSP (`Interfaces.STM32.RCC`/`.GPIO`/`.USART`) -- confirmed directly
+against files under the installed toolchain, not assumed -- so neither
+driver hand-rolls raw register addresses; `lowlevel/src/bifrost-board.ads`
+holds only pin mnemonics now, the same role `samv71_tiny-board.ads`
+plays for its board.
+
+## Build
+
+Toolchain prerequisites: see `../SETUP.md`, plus the one-time
+`runtime-overrides/README.md` step above.
+
+```
+$ cd f767zi
+$ bash buildw.sh
+```
+
+(`build.sh` for native Linux.) Invokes `gprbuild` against `bifrost.gpr`,
+cross-compiling for `arm-eabi` with the `light-tasking-stm32f769disco`
+runtime, producing `bin/bifrost.elf`.
+
+## Debugging
+
+Same ST-Link/OpenOCD chain as `f722ze-tiny` -- same physical debug
+probe, same board family, same stock `target/stm32f7x.cfg` (verified on
+real hardware to auto-probe this chip's flash size correctly via its
+own device-ID-aware erratum handling -- no local override needed).
+`setupw.sh` now prefers `arm-none-eabi-gdb` over `arm-eabi-gdb` -- see
+"Status" above for why that matters, not just stylistically.
+
+```
+$ bash setupw.sh -s
+```
+
+```
+$ bash setupw.sh -d -i bin/bifrost.elf
+```
+
+If `monitor flash banks` ever reports `0x00080000` instead of
+`0x00200000` for the main bank on connect, that's a one-off bad first
+`device id` read, not a real/persistent fault -- reconnect (power-cycle
+if reconnecting alone doesn't clear it) rather than touching any
+`.cfg`. Flash with OpenOCD's own `program ... verify reset` (via its
+telnet console, port 4444) rather than gdb's `load` -- see "Status"
+above.
+
+No GDB session transcript or proof-of-life screenshot has been
+captured yet for this port (unlike `f722ze-tiny` above), but the
+underlying proof of life -- real console output over the UART -- is
+confirmed working.
 
 # samv71-tiny (SAMV71 Xplained Ultra)
 

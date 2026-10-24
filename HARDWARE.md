@@ -93,10 +93,22 @@ where F722ZE doesn't (yet).
 `bifrost`'s Ada port -- interrupt-driven, bidirectional UART I/O with a
 TinyMon console, plus the LCD counter demo -- was built and proven on an
 actual F722ZE (the board on hand at the time, before the F767ZI
-preference was settled); see [`ada/README.md`](ada/README.md). Its
-tasking phase is not yet implemented and is waiting on an F767ZI to
-develop and verify against -- no source changes have been made for it
-yet.
+preference was settled); see [`ada/README.md`](ada/README.md). That
+tree (`ada/f722ze-tiny/`) stays as-is and does not grow a tasking phase
+of its own.
+
+The tasking phase lives in its own tree instead, `ada/f767zi/`: real
+Ravenscar tasking (Main/`LCD_Sink`/`UART_Sink`, protected-object UART,
+no hand-written startup -- the runtime supplies it), written and
+verified to compile/bind clean against the real toolchain, but not yet
+run on actual F767ZI hardware -- still no board in hand. See
+[`ada/README.md`](ada/README.md#f767zi-nucleo-f767zi) and
+`ada/f767zi/runtime-overrides/README.md` for a real, concrete
+consequence of not having the board yet: this board's actual HSE
+(8MHz) differs from the installed `light-tasking-stm32f769disco`
+profile's own default (25MHz, calibrated for the unrelated
+STM32F769-Discovery board), discovered and fixed by reading the
+runtime's own clock bring-up source rather than assumed.
 
 `samv71-tiny`'s Ada port is complete and fully verified on the SAMV71
 Xplained Ultra: real Ravenscar tasking, interrupt-driven USART1 I/O, the

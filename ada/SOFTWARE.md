@@ -380,6 +380,58 @@ computes a fresh, correct 115200-baud divisor (`CD => 81, FP => 3`) for
 that actual clock, rather than carrying the C side's mismatched
 constants forward.
 
+# How f767zi Differs
+
+`f767zi` is `f722ze-tiny`'s tasking phase (see "Requirements" above,
+and [`../HARDWARE.md`](../HARDWARE.md)), but built as its own tree,
+not a variant of `f722ze-tiny` -- same reasoning this document already
+gives for why `samv71-tiny` is its own tree. Architecturally it reuses
+`samv71-tiny`'s patterns directly rather than inventing new ones: a
+protected-object UART driver (`Bifrost.UART`, `pragma Attach_Handler`
+on `Ada.Interrupts.Names.USART3_Interrupt`, blocking `Put`/`Get`
+entries) and a library-level console task (`Bifrost.TinyMon`'s
+`UART_Sink`) that blocks on `Get`, structurally identical to
+`Samv71_Tiny.USART1`/`Samv71_Tiny.TinyMon`'s own `Console` task, just
+against USART3's register set instead of USART1's.
+
+Two differences worth calling out on their own:
+
+**A real two-task split, not one.** `samv71-tiny` only ever needed one
+application task (`Console`) because it has no periodic display to
+drive. `f767zi` has both halves of the Main/`LCD_Sink`/`UART_Sink`
+design this document originally planned: `Bifrost.LCD_Sink`'s task owns
+the LCD end to end -- hardware bring-up, the one-time splash, and the
+recurring counter display, deliberately all three, not just the
+recurring part. Splitting the splash into `Main`'s own task while
+`LCD_Sink` separately owned only the periodic update was the first
+design tried here, and it was wrong: a library-level task is already
+activated (and, per Ravenscar's elaboration-then-activate order,
+already running) before `Main`'s own body starts, so `Main` doing the
+splash directly would have raced `LCD_Sink` already calling into the
+same un-synchronized `Bifrost.LCD_Control` -- two tasks bit-banging the
+same HD44780 interface concurrently. `Bifrost.LCD`/`.LCD_Control` have
+no protected object of their own (same as `f722ze-tiny`), so the fix is
+the same kind of invariant `Bifrost.UART`'s protected object enforces
+for USART3: exactly one task touches the LCD, ever.
+
+**A real board BSP, unlike `f722ze-tiny`.** `f722ze-tiny`'s "no BSP
+exists, hand-write everything" situation (see "BSP and Drivers" above)
+is specific to F722ZE's `light-cortex-m7f` runtime -- F767ZI's
+`light-tasking-stm32f769disco` bundles a genuine SVD-generated BSP
+(`Interfaces.STM32.RCC`/`.GPIO`/`.USART`), confirmed directly against
+files under the installed toolchain, the same situation `samv71-tiny`
+is in with `Interfaces.SAM.*`. Neither `Bifrost.UART` nor `Bifrost.LCD`
+hand-roll raw register addresses here; `lowlevel/src/bifrost-board.ads`
+holds only pin mnemonics, same role `samv71_tiny-board.ads` plays.
+
+Not yet run on real hardware -- see `../f767zi/runtime-overrides/
+README.md` for the one concrete, real consequence of that: the
+installed `light-tasking-stm32f769disco` profile's own board-clock
+constants are calibrated for the unrelated STM32F769-Discovery board's
+25MHz crystal, not NUCLEO-F767ZI's actual 8MHz HSE -- caught by reading
+the runtime's own `Setup_Pll` source rather than assumed, and fixed via
+that runtime's documented `gnat_user/` override mechanism.
+
 # The Main Super Loop
 
 Inside the `Main` procedure we find that the super-loop is the most reliable and simplest way
