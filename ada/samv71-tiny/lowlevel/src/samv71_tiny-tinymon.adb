@@ -30,18 +30,40 @@ package body Samv71_Tiny.TinyMon is
 
    Prompt : constant String := ASCII.CR & ASCII.LF & "TinyMon> ";
 
+   Platform_Desc : constant String := "SAMV71 Xplained Ultra (ATSAMV71Q21B)";
+
+   -- Hand-edit this on each release. Deliberately not derived from the
+   -- git commit SHA -- a build can't know the SHA of the commit that
+   -- will contain it, and a plain string avoids that chicken-and-egg
+   -- problem entirely.
+   Software_Version : constant String := "0.1.0";
+
+   License_Text : constant String :=
+     "Copyright (c) 2025 Jeff Wandling. All rights reserved. | " &
+     "BSD 3-Clause License";
+
+   License_Reply : constant String :=
+     ASCII.CR & ASCII.LF & License_Text & ASCII.CR & ASCII.LF;
+
    Help_Dialogue : constant String :=
      ASCII.CR & ASCII.LF & ASCII.LF &
+     Platform_Desc & ASCII.CR & ASCII.LF &
+     "Version " & Software_Version & ASCII.CR & ASCII.LF &
+     License_Text & ASCII.CR & ASCII.LF & ASCII.LF &
      "Enter one of the following commands and its parameters:" &
      ASCII.CR & ASCII.LF &
      "cmda" & ASCII.CR & ASCII.LF &
      "cmdb led_id (0 <= led_id <= 1)" & ASCII.CR & ASCII.LF &
-     "cmdc led_id (0 <= led_id <= 1)" & ASCII.CR & ASCII.LF & ASCII.LF &
+     "cmdc led_id (0 <= led_id <= 1)" & ASCII.CR & ASCII.LF &
+     "license" & ASCII.CR & ASCII.LF & ASCII.LF &
      "i.e. cmdb 1" & ASCII.CR & ASCII.LF;
 
    Welcome : constant String :=
      ASCII.CR & ASCII.LF & ASCII.CR & ASCII.LF &
      "This is TinyMon" & ASCII.CR & ASCII.LF &
+     Platform_Desc & ASCII.CR & ASCII.LF &
+     "Version " & Software_Version & ASCII.CR & ASCII.LF &
+     License_Text & ASCII.CR & ASCII.LF & ASCII.CR & ASCII.LF &
      "Type 'help' for more information." & ASCII.CR & ASCII.LF &
      ASCII.CR & ASCII.LF;
 
@@ -69,6 +91,11 @@ package body Samv71_Tiny.TinyMon is
    begin
       Put_String (Help_Dialogue);
    end Show_Help;
+
+   procedure Show_License is
+   begin
+      Put_String (License_Reply);
+   end Show_License;
 
    -- Direct port of nibble_to_ascii + the hex-digit half of
    -- build_cmd_packet_str's byte-dump loop.
@@ -154,6 +181,8 @@ package body Samv71_Tiny.TinyMon is
    begin
       if Line = "help" or else Line = "h" then
          Show_Help;
+      elsif Line = "license" then
+         Show_License;
       else
          Cmd_State := (others => Standby);
          Packet := (others => 0);
