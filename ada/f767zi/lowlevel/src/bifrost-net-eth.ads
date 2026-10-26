@@ -70,4 +70,14 @@ package Bifrost.Net.Eth is
    function Sent_OK return Interfaces.Unsigned_32;
    function Sent_Fail return Interfaces.Unsigned_32;
 
+   -- A real MAC *hardware* counter (RM0410's MMCTGFCR) -- increments
+   -- as a direct side effect of the MAC physically pushing a frame
+   -- out, with no software layer in between. The decisive check: if
+   -- this climbs in step with Sent_OK, the MAC genuinely transmitted
+   -- and the problem is external (cable, PHY-to-link-partner
+   -- electrical); if it stays at zero while Sent_OK climbs, the DMA
+   -- never actually fired despite every software layer reporting
+   -- success.
+   function Mmc_Tx_Good_Frames return Interfaces.Unsigned_32;
+
 end Bifrost.Net.Eth;

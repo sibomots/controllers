@@ -173,6 +173,10 @@ package body Bifrost.TinyMon is
       Put_String ("sent fail:     ");
       Put_Natural (Natural (Bifrost.Net.Eth.Sent_Fail));
       Put_String (CRLF);
+
+      Put_String ("MAC TX frames: ");
+      Put_Natural (Natural (Bifrost.Net.Eth.Mmc_Tx_Good_Frames));
+      Put_String (CRLF);
    end Show_Net;
 
    procedure Clear_Buffer is

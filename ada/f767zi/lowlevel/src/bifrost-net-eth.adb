@@ -126,4 +126,12 @@ package body Bifrost.Net.Eth is
       return C_Udp_Sent_Fail;
    end Sent_Fail;
 
+   function C_Mmc_Tx_Good_Frames return Interfaces.Unsigned_32
+     with Import, Convention => C, External_Name => "bifrost_eth_mmc_tx_good_frames";
+
+   function Mmc_Tx_Good_Frames return Interfaces.Unsigned_32 is
+   begin
+      return C_Mmc_Tx_Good_Frames;
+   end Mmc_Tx_Good_Frames;
+
 end Bifrost.Net.Eth;

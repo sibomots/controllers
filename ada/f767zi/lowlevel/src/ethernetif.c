@@ -638,3 +638,17 @@ int bifrost_eth_netif_is_link_up(void)
 {
     return netif_is_link_up(&gnetif) ? 1 : 0;
 }
+
+/* Real MAC hardware counter (RM0410's MMCTGFCR, "number of good
+ * frames transmitted") -- free-running, increments as a direct side
+ * effect of the MAC actually pushing a frame out, with no software
+ * layer in between. Added specifically to bisect "the MAC genuinely
+ * transmitted, something external (cable/PHY-to-NIC) is wrong" from
+ * "the MAC never actually fired despite HAL_ETH_Transmit() returning
+ * HAL_OK" -- lwIP's own udp_send()/HAL's own return codes only
+ * confirm the DMA descriptor was handed over, not that a frame
+ * physically left the PHY. */
+uint32_t bifrost_eth_mmc_tx_good_frames(void)
+{
+    return EthHandle.Instance->MMCTGFCR;
+}
