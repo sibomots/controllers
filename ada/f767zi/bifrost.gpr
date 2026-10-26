@@ -123,7 +123,22 @@ project Bifrost is
          -- device header to pull in (stm32f767xx.h). Standard CMSIS
          -- convention to pass this as a build-level -D, not hardcode
          -- it inside a vendored header.
-         "-DSTM32F767xx");
+         "-DSTM32F767xx",
+         -- Confirmed on real hardware (CFSR UsageFault, UNALIGNED bit,
+         -- on a plain word `ldr`): this Ada runtime has alignment-trap
+         -- checking enabled, and GCC does not reliably generate
+         -- alignment-safe code for every packed-struct field read in
+         -- the vendored lwIP tree on this target/version -- confirmed
+         -- in two separate spots (etharp.c's IP-address copy, then
+         -- ip4.c's, both on the same Ethernet-header-induced 2-byte
+         -- offset) with no reason to assume there aren't more, lurking
+         -- in tcp.c/udp.c/etc. Patching individual call sites (done
+         -- for the first one, via SMEMCPY's own override hook -- not
+         -- reverted, since it's still correct) doesn't scale to a
+         -- whole vendored tree. This flag tells GCC to never assume an
+         -- access is aligned unless it can prove so, generating safe
+         -- code everywhere this class of bug could otherwise hide.
+         "-mno-unaligned-access");
    end Compiler;
 
    package Linker is
