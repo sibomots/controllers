@@ -14,10 +14,42 @@
 
 #include "cpu.h"
 #include <stdlib.h>
+#include <stddef.h>
 
 typedef int sys_prot_t;
 
 #define LWIP_PROVIDE_ERRNO
+
+/* lwIP's own SMEMCPY/MEMCPY exist specifically for copies where the
+ * source/dest may not be naturally aligned -- e.g. etharp_input's own
+ * comment: ARP header fields sit right after a 14-byte Ethernet
+ * header, so they land on a 2-byte, not 4-byte, boundary. The
+ * default in lwip/opt.h just maps both to plain memcpy(), which is
+ * wrong here: this runtime has no libc at all (-nolibc, confirmed),
+ * so GCC inlines a small constant-size memcpy() as a single word
+ * load/store -- fine on most C environments (Cortex-M7 tolerates
+ * unaligned single-word LDR/STR by default), but this Ada runtime
+ * has alignment-trap checking enabled (confirmed directly on real
+ * hardware: UsageFault, CFSR UNALIGNED bit set, catching exactly
+ * this word-sized access on an odd-aligned ARP field) -- plausibly
+ * deliberate on GNAT's part, since it catches a real class of error
+ * Ada's own type system would normally prevent. The fix belongs
+ * here, not in disabling that trap: a byte-at-a-time copy is safe
+ * regardless of alignment or trap configuration, on any target, and
+ * is exactly what lwIP's own SMEMCPY/MEMCPY indirection exists to let
+ * a platform provide. */
+static inline void *bifrost_byte_memcpy(void *dst, const void *src, size_t len)
+{
+    unsigned char *d = (unsigned char *)dst;
+    const unsigned char *s = (const unsigned char *)src;
+    while (len--)
+    {
+        *d++ = *s++;
+    }
+    return dst;
+}
+#define SMEMCPY(dst, src, len) bifrost_byte_memcpy((dst), (src), (len))
+#define MEMCPY(dst, src, len)  bifrost_byte_memcpy((dst), (src), (len))
 
 /* define compiler specific symbols -- GCC only; this project's C
  * sources only ever build with arm-eabi-gcc (the GNAT-FSF toolchain's
