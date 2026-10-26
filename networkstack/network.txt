@@ -1,0 +1,13 @@
+https://community.st.com/stm32-mcus-60/how-to-create-a-project-for-stm32h7-with-ethernet-and-lwip-stack-working-32
+
+
+https://github.com/STMicroelectronics/STM32CubeF7/tree/master/Projects/STM32F767ZI-Nucleo/Applications/LwIP/LwIP_HTTP_Server_Netconn_RTOS
+
+https://github.com/STMicroelectronics/STM32_open_pin_data/blob/master/boards/A71_Nucleo_NUCLEO-F767ZI_STM32F767ZI_Board_AllConfig.ioc
+
+
+https://community.st.com/t5/stm32-mcus/how-to-create-a-project-for-stm32h7-with-ethernet-and-lwip-stack/ta-p/49308
+
+ 
+
+https://github.com/STMicroelectronics/STM32CubeF7/blob/master/Projects/STM32F767ZI-Nucleo/Applications/LwIP/LwIP_HTTP_Server_Netconn_RTOS/SW4STM32/STM32F767ZI_Nucleo/STM32F767ZITx_FLASH.ld

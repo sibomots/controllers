@@ -1,0 +1,41 @@
+When building a network stack on the NUCLEO-F767ZI, you have two main pathways depending on whether your application requires multi-threading. You can deploy it as a standalone bare-metal stack (Polling/Callback model) or integrate it with a real-time operating system like FreeRTOS (Sequential/Socket model).
+
+Core Hardware Mapping (LAN8742A PHY)
+
+The NUCLEO-F767ZI features an onboard Microchip LAN8742A PHY connected via a Reduced Media Independent Interface (RMII). The system relies on a split architecture:
+[ STM32F767 Core ] <---(RMII Interface)---> [ LAN8742A PHY ] <---> [ RJ45 Port ]
+        |                                        ^
+        +----------(MDIO / MDC Management)-------+
+
+Network Stack Architectures
+
+Choosing the correct deployment architecture dictates how your application firmware processes data packets:
+
+Feature / Metric	Bare-Metal Stack (Standalone)	RTOS-Integrated Stack (FreeRTOS)
+Primary Framework	LwIP (lwIP raw API)	LwIP (Netconn / BSD Socket API)
+Execution Model	Non-blocking polling or event callbacks.	Blocking calls managed inside dedicated OS threads.
+Resource Footprint	Extremely low RAM and Flash consumption.	Higher RAM consumption due to separate thread stacks.
+Best Used For	Basic telemetry, simple UDP/TCP servers, web interfaces.	Multi-socket connections, HTTP clients, MQTT, TLS.
+Main Loop Syntax	MX_LWIP_Process(); in while(1) loop.	Handled automatically by osKernelStart();.
+
+
+Critical Setup Pitfalls & Solutions
+
+Regardless of your chosen stack structure, you must bypass the standard issues embedded within default STM32CubeMX generated code for the F7 series:
+
+1. Hardware Clock & Pin Matrix
+
+• Navigate to RCC and set the High-Speed Clock (HSE) to Bypass Clock Source. The ST-LINK on the board generates an 8 MHz clock signal directly to the MCU.
+• Ensure the SYSCLK / HCLK is configured to its maximum rating of 216 MHz.
+• Verify that the RMII pin configuration matches the physical traces on the Nucleo board:
+	• REF_CLK: PA1
+	• MDIO / MDC: PA2 / PC1
+	• CRS_DV / RXD0 / RXD1: PA7 / PC4 / PC5
+	• TX_EN / TXD0 / TXD1: PG11 / PG13 / PG14
+
+2. D-Cache Coherency Workaround
+
+Because the Cortex-M7 features an aggressive L1 Data Cache, the CPU can read stale packet data while the Ethernet DMA engine writes new packets directly to physical RAM.
+• Add an MPU Configuration region inside main.c right before your peripheral initialization routines.
+• Configure a memory zone (e.g., SRAM2 at base 0x2007C000) as Non-Cacheable and Non-Bufferable (Shareable).
+• Map your .RxDecripSection and .TxDescripSection variables into this memory space via your linker script (.ld file).

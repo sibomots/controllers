@@ -40,10 +40,47 @@ project Bifrost is
    for Target use "arm-eabi";
    for Runtime ("Ada") use "light-tasking-stm32f769disco";
 
+   -- "C" added for the network telemetry feature -- vendored HAL_ETH/
+   -- CMSIS/lwIP C sources live under vendor/, plus a hand-written
+   -- Ada/C glue layer in lowlevel/src. See vendor/placeholder.c's own
+   -- comment: this Phase A addition exists to confirm mixed Ada/C
+   -- linking against light-tasking-stm32f769disco actually works on
+   -- this toolchain before any real vendored source is added.
+   for Languages use ("Ada", "C");
+
    for Source_Dirs use
      ("app/src",
       "behavioral/src",
-      "lowlevel/src");
+      "lowlevel/src",
+      "vendor",
+      -- CMSIS device header + generic Cortex-M7 core headers (flat
+      -- include style, e.g. "stm32f767xx.h", "core_cm7.h" -- no
+      -- subdirectory prefix, so each is its own Source_Dirs entry).
+      "vendor/cmsis_f7/Include",
+      "vendor/cmsis_f7/CMSIS/Include",
+      -- HAL -- only the 7 modules this project's ETH/lwIP glue needs
+      -- (see lowlevel/src/stm32f7xx_hal_conf.h's own comment for why
+      -- HAL_FLASH/HAL_PWR/HAL_DMA are deliberately absent).
+      "vendor/hal_f7/Inc",
+      "vendor/hal_f7/Src",
+      -- LAN8742A PHY driver (flat include style).
+      "vendor/lan8742",
+      -- lwIP: "src/include" is ONE non-recursive entry on purpose --
+      -- it's the root that "#include \"lwip/pbuf.h\""-style paths
+      -- resolve against; listing its subdirectories individually
+      -- would break that resolution, not fix it. "core"/"core/ipv4"/
+      -- "netif" are separate entries because those hold the actual
+      -- .c files to compile, pruned to UDP/IPv4-only (no TCP/IPv6/PPP/
+      -- 6LoWPAN/bridging -- see vendor/lwip's own pruned tree).
+      "vendor/lwip/src/include",
+      "vendor/lwip/src/core",
+      "vendor/lwip/src/core/ipv4",
+      "vendor/lwip/src/netif",
+      -- lwIP's arch port headers ("arch/cc.h", "arch/sys_arch.h",
+      -- included WITH that prefix from inside lwip/arch.h and
+      -- lwip/sys.h) -- the Source_Dirs entry is the *parent* of
+      -- arch/, not arch/ itself, so that prefixed include resolves.
+      "vendor/lwip/system");
 
    for Object_Dir use "obj";
    for Exec_Dir use "bin";
@@ -72,6 +109,21 @@ project Bifrost is
         Compiler'Default_Switches ("Ada") & ("-gnatwI");
       for Switches ("bifrost-lcd.adb") use
         Compiler'Default_Switches ("Ada") & ("-gnatwI");
+
+      -- The runtime's own runtime.xml injects -mcpu/-mfpu/-mfloat-abi
+      -- automatically for the Ada compiler (via Runtime ("Ada") above)
+      -- -- that injection is scoped to Ada, not guaranteed for C, so
+      -- it has to be stated explicitly here to match, or vendored C
+      -- object code would target the wrong ABI and fail to link
+      -- against (or silently mismatch) the Ada runtime's own objects.
+      for Default_Switches ("C") use
+        ("-mcpu=cortex-m7", "-mthumb", "-mfpu=fpv5-d16", "-mfloat-abi=hard",
+         "-g", "-ffunction-sections", "-fdata-sections",
+         -- CMSIS device-selection macro: tells stm32f7xx.h which
+         -- device header to pull in (stm32f767xx.h). Standard CMSIS
+         -- convention to pass this as a build-level -D, not hardcode
+         -- it inside a vendored header.
+         "-DSTM32F767xx");
    end Compiler;
 
    package Linker is

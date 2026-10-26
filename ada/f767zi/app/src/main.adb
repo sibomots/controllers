@@ -26,6 +26,7 @@
 -- equivalent.
 with Bifrost.UART;
 with Bifrost.TinyMon;
+with Bifrost.Net.Eth;
 
 -- Pulled in for its task's elaboration side effect only -- see
 -- Bifrost.LCD_Sink's spec comment. Nothing in this procedure calls into
@@ -34,10 +35,22 @@ with Bifrost.TinyMon;
 with Bifrost.LCD_Sink;
 pragma Unreferenced (Bifrost.LCD_Sink);
 
+-- Same reason as Bifrost.LCD_Sink above -- Telemetry_Sink is a
+-- library-level task, started automatically; nothing here calls into
+-- Bifrost.Telemetry directly.
+with Bifrost.Telemetry;
+pragma Unreferenced (Bifrost.Telemetry);
+
 procedure Main is
 begin
    Bifrost.UART.Initialize;
    Bifrost.TinyMon.Show_Welcome;
+
+   -- Console first, for debug visibility if Ethernet bring-up ever
+   -- has something to say -- see Bifrost.Net.Eth's own spec comment
+   -- on the one ordering gap this leaves relative to Telemetry_Sink,
+   -- which is already running by this point.
+   Bifrost.Net.Eth.Initialize;
 
    loop
       delay 60.0;

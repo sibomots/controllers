@@ -100,9 +100,10 @@ set -e
 
 # nuke it
 rm -rf obj bin
+rm -f lowlevel/src/bifrost-net-config.ads lowlevel/src/bifrost_net_config.h
 
 if [ "$CleanOnly" = "yes" ]; then
-    echo "Clean-only requested; obj/ and bin/ removed. Not rebuilding."
+    echo "Clean-only requested; obj/, bin/, and the generated net config removed. Not rebuilding."
     exit 0
 fi
 
@@ -121,4 +122,11 @@ if [ "$MissingTool" = "yes" ]; then
 fi
 
 mkdir -p obj bin
+
+## Build-time network config -- see net.conf and gen_net_config.sh.
+## Regenerated on every build; lowlevel/src/bifrost-net-config.ads and
+## bifrost_net_config.h are build artifacts (gitignored), never
+## hand-edited directly.
+bash gen_net_config.sh net.conf
+
 gprbuild -P bifrost.gpr ${USE_VERBOSE}
