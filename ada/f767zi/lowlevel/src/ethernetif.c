@@ -316,6 +316,23 @@ static err_t low_level_output(struct netif *netif, struct pbuf *p)
         {
             Txbuffer[i].next = NULL;
         }
+        /* Unlike eth_dma_region (descriptors + RX pool), this pbuf's
+         * backing memory is ordinary cacheable SRAM -- it comes from
+         * lwIP's own heap (see bifrost_udp_sink.c's pbuf_alloc(...,
+         * PBUF_RAM)), not the MPU's Non-Cacheable carve-out. The CPU's
+         * header/payload writes can sit dirty in the D-cache
+         * indefinitely; the Ethernet DMA engine reads physical RAM
+         * directly and does not see them until flushed. Confirmed on
+         * real hardware: without this, Wireshark captures showed
+         * everything from the IP destination field onward reading as
+         * stale/zero (once even exposing literal leftover bytes from
+         * an earlier, unrelated ARP transmission that happened to
+         * physically occupy the same heap slot) while the fields
+         * written earliest (and so most likely already evicted)
+         * consistently came through correct -- the classic signature
+         * of a cache-vs-DMA coherency gap, not a software logic bug. */
+        SCB_CleanDCache_by_Addr((uint32_t *)((uint32_t)q->payload & ~0x1FUL),
+                                 (int32_t)(q->len + ((uint32_t)q->payload & 0x1FUL)));
         i++;
     }
 
