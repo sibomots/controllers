@@ -10,6 +10,8 @@
 -- See the LICENSE file for the full text.
 -- ============================================================================
 
+with Interfaces;
+
 -- Ada face of the Ethernet/lwIP bring-up. The actual MAC/DMA/PHY
 -- driver (vendor/hal_f7, vendor/lan8742) and the lwIP network
 -- interface glue (../src/ethernetif.c, hand-written, NOT vendored)
@@ -40,5 +42,32 @@ package Bifrost.Net.Eth is
    -- `while(1) { ethernetif_input(); sys_check_timeouts(); }` with
    -- this project's own Ravenscar periodic-task cadence instead.
    procedure Poll;
+
+   -- Diagnostics for TinyMon's "net" command -- added after a real
+   -- hardware session where the link was confirmed up on the host
+   -- side (Get-NetAdapter: Connected, 100 Mbps) but zero bytes ever
+   -- arrived, with nothing on the board visible to explain why. Each
+   -- queries the C glue directly; see ethernetif.c's own comments.
+
+   -- Raw MDIO read of PHY link/speed/duplex state (one of
+   -- lan8742.h's LAN8742_STATUS_* values -- 1 = link down, 2..5 =
+   -- various speed/duplex combinations when up, negative = an
+   -- MDIO/PHY communication error, distinct from "no link partner").
+   function Phy_Link_State return Integer;
+
+   -- The software's own belief, as lwIP's netif tracks it. Compare
+   -- against Phy_Link_State: both agreeing "up" means the whole chain
+   -- is working; Phy_Link_State reporting link-up while these report
+   -- False means the software side hasn't noticed yet (the bug this
+   -- diagnostic was added to catch) rather than a real PHY problem.
+   function Netif_Up return Boolean;
+   function Netif_Link_Up return Boolean;
+
+   -- Running counts from Bifrost.Telemetry.Sinks.Udp_Unicast's calls
+   -- into bifrost_udp_sink.c -- Sent_Fail incrementing while
+   -- Netif_Up/Netif_Link_Up are both True would point at a UDP/lwIP-
+   -- level problem rather than the network interface itself.
+   function Sent_OK return Interfaces.Unsigned_32;
+   function Sent_Fail return Interfaces.Unsigned_32;
 
 end Bifrost.Net.Eth;

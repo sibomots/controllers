@@ -14,6 +14,7 @@ with System;
 with Bifrost.UART;
 with Bifrost.LCD_String;
 with Bifrost.LCD_Config;
+with Bifrost.Net.Eth;
 
 package body Bifrost.TinyMon is
 
@@ -50,7 +51,8 @@ package body Bifrost.TinyMon is
      "Available commands:" & ASCII.CR & ASCII.LF &
      "help" & ASCII.CR & ASCII.LF &
      "count" & ASCII.CR & ASCII.LF &
-     "license" & ASCII.CR & ASCII.LF;
+     "license" & ASCII.CR & ASCII.LF &
+     "net" & ASCII.CR & ASCII.LF;
 
    License_Reply : constant String :=
      ASCII.CR & ASCII.LF & License_Text & ASCII.CR & ASCII.LF;
@@ -115,6 +117,64 @@ package body Bifrost.TinyMon is
       Put_String (CRLF);
    end Show_Count;
 
+   -- Added after a real hardware session where the host side showed
+   -- the physical link up (100 Mbps, Connected) but zero bytes ever
+   -- arrived, with nothing on the board visible to explain why --
+   -- see Bifrost.Net.Eth's own spec comment on each field queried
+   -- here.
+   procedure Show_Net is
+      Num_Buf : String (1 .. Bifrost.LCD_Config.LCD_Max_Col);
+      Length  : Natural;
+
+      procedure Put_Natural (N : Natural) is
+         Snapshot : Natural := N;
+      begin
+         Bifrost.LCD_String.Format (Snapshot, Num_Buf, Length);
+         Put_String (Num_Buf (1 .. Length));
+      end Put_Natural;
+
+      function Link_State_Text return String is
+         State : constant Integer := Bifrost.Net.Eth.Phy_Link_State;
+      begin
+         case State is
+            when 1      => return "LINK_DOWN";
+            when 2      => return "100M_FULL_DUPLEX";
+            when 3      => return "100M_HALF_DUPLEX";
+            when 4      => return "10M_FULL_DUPLEX";
+            when 5      => return "10M_HALF_DUPLEX";
+            when 6      => return "AUTONEG_NOT_DONE";
+            when -1     => return "PHY_ERROR";
+            when -2     => return "PHY_RESET_TIMEOUT";
+            when -3     => return "PHY_ADDRESS_ERROR";
+            when -4     => return "PHY_WRITE_ERROR";
+            when -5     => return "PHY_READ_ERROR";
+            when others => return "UNKNOWN";
+         end case;
+      end Link_State_Text;
+   begin
+      Put_String (CRLF);
+
+      Put_String ("PHY link:      ");
+      Put_String (Link_State_Text);
+      Put_String (CRLF);
+
+      Put_String ("netif up:      ");
+      Put_String ((if Bifrost.Net.Eth.Netif_Up then "yes" else "no"));
+      Put_String (CRLF);
+
+      Put_String ("netif link up: ");
+      Put_String ((if Bifrost.Net.Eth.Netif_Link_Up then "yes" else "no"));
+      Put_String (CRLF);
+
+      Put_String ("sent OK:       ");
+      Put_Natural (Natural (Bifrost.Net.Eth.Sent_OK));
+      Put_String (CRLF);
+
+      Put_String ("sent fail:     ");
+      Put_Natural (Natural (Bifrost.Net.Eth.Sent_Fail));
+      Put_String (CRLF);
+   end Show_Net;
+
    procedure Clear_Buffer is
    begin
       Idx := 0;
@@ -129,6 +189,8 @@ package body Bifrost.TinyMon is
          Show_Count;
       elsif Line = "license" then
          Show_License;
+      elsif Line = "net" then
+         Show_Net;
       else
          Put_String (Unknown_Text);
       end if;

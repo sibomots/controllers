@@ -28,6 +28,8 @@
 #include <string.h>
 
 static struct udp_pcb *s_pcb;
+static uint32_t s_sent_ok;
+static uint32_t s_sent_fail;
 
 static void ensure_pcb(void)
 {
@@ -68,17 +70,40 @@ void bifrost_udp_publish(const uint8_t *data, uint16_t length)
     ensure_pcb();
     if (s_pcb == NULL)
     {
+        s_sent_fail++;
         return;
     }
 
     p = pbuf_alloc(PBUF_TRANSPORT, length, PBUF_RAM);
     if (p == NULL)
     {
+        s_sent_fail++;
         return; /* out of pbufs this tick -- drop, same as any other
                   * best-effort UDP sender; next tick tries again. */
     }
 
     memcpy(p->payload, data, length);
-    udp_send(s_pcb, p);
+    if (udp_send(s_pcb, p) == ERR_OK)
+    {
+        s_sent_ok++;
+    }
+    else
+    {
+        /* Previously silently ignored -- a real gap: e.g. ERR_RTE
+         * ("no route") when the interface is down fails exactly this
+         * way, with nothing anywhere surfacing it. */
+        s_sent_fail++;
+    }
     pbuf_free(p);
+}
+
+/* TinyMon "net" command diagnostics. */
+uint32_t bifrost_udp_sent_ok(void)
+{
+    return s_sent_ok;
+}
+
+uint32_t bifrost_udp_sent_fail(void)
+{
+    return s_sent_fail;
 }

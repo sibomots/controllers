@@ -10,7 +10,7 @@
 -- See the LICENSE file for the full text.
 -- ============================================================================
 
-with Interfaces;
+with Interfaces; use Interfaces;
 with Ada.Real_Time; use Ada.Real_Time;
 
 package body Bifrost.Net.Eth is
@@ -81,5 +81,49 @@ package body Bifrost.Net.Eth is
       -- statement would be illegal.
       delay Duration (Delay_Ms) / 1000.0;
    end HAL_Delay;
+
+   -- ------------------------------------------------------------------
+   -- Diagnostics -- see the spec's own comment on why these exist.
+   -- ------------------------------------------------------------------
+
+   function C_Phy_Link_State return Interfaces.Integer_32
+     with Import, Convention => C, External_Name => "bifrost_eth_phy_link_state";
+
+   function C_Netif_Is_Up return Interfaces.Integer_32
+     with Import, Convention => C, External_Name => "bifrost_eth_netif_is_up";
+
+   function C_Netif_Is_Link_Up return Interfaces.Integer_32
+     with Import, Convention => C, External_Name => "bifrost_eth_netif_is_link_up";
+
+   function C_Udp_Sent_OK return Interfaces.Unsigned_32
+     with Import, Convention => C, External_Name => "bifrost_udp_sent_ok";
+
+   function C_Udp_Sent_Fail return Interfaces.Unsigned_32
+     with Import, Convention => C, External_Name => "bifrost_udp_sent_fail";
+
+   function Phy_Link_State return Integer is
+   begin
+      return Integer (C_Phy_Link_State);
+   end Phy_Link_State;
+
+   function Netif_Up return Boolean is
+   begin
+      return C_Netif_Is_Up /= 0;
+   end Netif_Up;
+
+   function Netif_Link_Up return Boolean is
+   begin
+      return C_Netif_Is_Link_Up /= 0;
+   end Netif_Link_Up;
+
+   function Sent_OK return Interfaces.Unsigned_32 is
+   begin
+      return C_Udp_Sent_OK;
+   end Sent_OK;
+
+   function Sent_Fail return Interfaces.Unsigned_32 is
+   begin
+      return C_Udp_Sent_Fail;
+   end Sent_Fail;
 
 end Bifrost.Net.Eth;

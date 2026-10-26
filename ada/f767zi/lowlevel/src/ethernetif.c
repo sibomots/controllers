@@ -541,8 +541,100 @@ void bifrost_ethernetif_init(void)
     netif_set_default(&gnetif);
 }
 
+/* Re-checks PHY link state every tick. Needed because low_level_init()
+ * above only checks link state once, at boot: if the LAN8742A hadn't
+ * finished autonegotiating with the link partner yet at that exact
+ * moment (a few hundred ms to a couple seconds is normal), the
+ * interface would otherwise stay marked down forever, even once the
+ * link genuinely comes up moments later -- confirmed as a real,
+ * reproduced bug on actual hardware (the link came up fine per the
+ * host side, HAL_ETH_Start() was simply never called because nothing
+ * ever re-checked after the first, too-early look). ST's own
+ * FreeRTOS reference example handles this with a periodic
+ * ethernet_link_check_state() call from a dedicated thread; this is
+ * the same logic, called from here instead since there's no RTOS
+ * thread to run it on. */
+static void bifrost_eth_link_poll(void)
+{
+    ETH_MACConfigTypeDef MACConf = {0};
+    int32_t PHYLinkState = LAN8742_GetLinkState(&LAN8742);
+    uint32_t speed = 0, duplex = 0;
+
+    if (netif_is_link_up(&gnetif) && (PHYLinkState <= LAN8742_STATUS_LINK_DOWN))
+    {
+        HAL_ETH_Stop(&EthHandle);
+        netif_set_down(&gnetif);
+        netif_set_link_down(&gnetif);
+        return;
+    }
+
+    if (netif_is_link_up(&gnetif) || (PHYLinkState <= LAN8742_STATUS_LINK_DOWN))
+    {
+        return; /* already up, or still down -- nothing changed */
+    }
+
+    switch (PHYLinkState)
+    {
+    case LAN8742_STATUS_100MBITS_FULLDUPLEX:
+        duplex = ETH_FULLDUPLEX_MODE;
+        speed = ETH_SPEED_100M;
+        break;
+    case LAN8742_STATUS_100MBITS_HALFDUPLEX:
+        duplex = ETH_HALFDUPLEX_MODE;
+        speed = ETH_SPEED_100M;
+        break;
+    case LAN8742_STATUS_10MBITS_FULLDUPLEX:
+        duplex = ETH_FULLDUPLEX_MODE;
+        speed = ETH_SPEED_10M;
+        break;
+    case LAN8742_STATUS_10MBITS_HALFDUPLEX:
+        duplex = ETH_HALFDUPLEX_MODE;
+        speed = ETH_SPEED_10M;
+        break;
+    default:
+        return; /* AUTONEGO_NOTDONE or a read/write error -- try again next tick */
+    }
+
+    HAL_ETH_GetMACConfig(&EthHandle, &MACConf);
+    MACConf.DuplexMode = duplex;
+    MACConf.Speed = speed;
+    HAL_ETH_SetMACConfig(&EthHandle, &MACConf);
+    HAL_ETH_Start(&EthHandle);
+    netif_set_up(&gnetif);
+    netif_set_link_up(&gnetif);
+}
+
 void bifrost_ethernetif_poll(void)
 {
+    bifrost_eth_link_poll();
     ethernetif_input(&gnetif);
     sys_check_timeouts();
+}
+
+/*******************************************************************************
+ *                       Diagnostics (TinyMon "net" command)
+ *******************************************************************************/
+
+/* Raw MDIO read of PHY link/speed/duplex state -- one of the
+ * LAN8742_STATUS_* values from lan8742.h (negative = a read/write/
+ * address/reset error talking to the PHY over MDIO itself, distinct
+ * from LAN8742_STATUS_LINK_DOWN which means MDIO is fine but no link
+ * partner is present). */
+int32_t bifrost_eth_phy_link_state(void)
+{
+    return LAN8742_GetLinkState(&LAN8742);
+}
+
+/* The software's own belief about interface state, as lwIP's netif
+ * tracks it -- compare against bifrost_eth_phy_link_state() above to
+ * tell a "PHY is fine, software hasn't noticed" bug apart from an
+ * actual PHY/MDIO problem. */
+int bifrost_eth_netif_is_up(void)
+{
+    return netif_is_up(&gnetif) ? 1 : 0;
+}
+
+int bifrost_eth_netif_is_link_up(void)
+{
+    return netif_is_link_up(&gnetif) ? 1 : 0;
 }
