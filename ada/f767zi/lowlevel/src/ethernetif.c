@@ -221,8 +221,15 @@ static void low_level_init(struct netif *netif)
     LWIP_MEMPOOL_INIT(RX_POOL);
 
     memset(&TxConfig, 0, sizeof(ETH_TxPacketConfigTypeDef));
-    TxConfig.Attributes = ETH_TX_PACKETS_FEATURES_CSUM | ETH_TX_PACKETS_FEATURES_CRCPAD;
-    TxConfig.ChecksumCtrl = ETH_CHECKSUM_IPHDR_PAYLOAD_INSERT_PHDR_CALC;
+    /* CRCPAD (Ethernet FCS + short-frame padding) is a separate,
+     * universal L2 MAC feature, unrelated to IP/UDP checksum
+     * insertion -- kept. ETH_TX_PACKETS_FEATURES_CSUM/ChecksumCtrl
+     * (hardware IP/UDP checksum insertion) deliberately removed --
+     * see lwipopts.h's own comment on why: it's the prime suspect for
+     * a real, observed bug (dest IP + UDP header reading as zero on
+     * actual hardware), not kept for a throughput need nothing here
+     * actually has. */
+    TxConfig.Attributes = ETH_TX_PACKETS_FEATURES_CRCPAD;
     TxConfig.CRCPadCtrl = ETH_CRC_PAD_INSERT;
 
     LAN8742_RegisterBusIO(&LAN8742, &LAN8742_IOCtx);

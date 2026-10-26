@@ -62,21 +62,28 @@
 #define LWIP_NETIF_LINK_CALLBACK 1
 
 /* ---------- Checksum options ---------- */
-/* STM32F7's ETH DMA can compute/verify IP/UDP/TCP/ICMP checksums in
- * hardware -- use that instead of lwIP's own software checksum code,
- * same choice the reference example makes, configured via
- * ETH_TxPacketConfig's ChecksumCtrl in the Ada/C glue's low_level_init
- * equivalent. */
-#define CHECKSUM_BY_HARDWARE
-#ifdef CHECKSUM_BY_HARDWARE
-#define CHECKSUM_GEN_IP 0
-#define CHECKSUM_GEN_UDP 0
-#define CHECKSUM_GEN_TCP 0
-#define CHECKSUM_CHECK_IP 0
-#define CHECKSUM_CHECK_UDP 0
-#define CHECKSUM_CHECK_TCP 0
-#define CHECKSUM_GEN_ICMP 0
-#endif
+/* Software checksums, not hardware offload. Originally used hardware
+ * offload (same choice the reference example makes) -- reverted after
+ * a real hardware session where every captured packet showed the
+ * destination IP and the entire UDP header (ports + length) reading
+ * as zero, with only the checksum field itself populated -- exactly
+ * the region hardware checksum insertion has to read and rewrite, and
+ * the only thing that differs between this packet and the
+ * byte-for-byte-correct earlier fields. Root cause not conclusively
+ * pinned down (would need lower-level register tracing this project
+ * doesn't have access to from here), but for a 1Hz, ~60-byte packet
+ * the performance cost of software checksumming is microseconds --
+ * not a trade-off worth keeping a suspect subsystem for. Revisit
+ * hardware offload only if there's a real throughput need later, with
+ * a logic analyzer or similar to actually confirm the mechanism
+ * first. */
+#define CHECKSUM_GEN_IP 1
+#define CHECKSUM_GEN_UDP 1
+#define CHECKSUM_GEN_TCP 1
+#define CHECKSUM_CHECK_IP 1
+#define CHECKSUM_CHECK_UDP 1
+#define CHECKSUM_CHECK_TCP 1
+#define CHECKSUM_GEN_ICMP 1
 
 /* ---------- Sequential layer / socket options ---------- */
 /* Raw API only -- no Netconn, no BSD sockets. */
