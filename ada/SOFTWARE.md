@@ -437,6 +437,42 @@ constants are calibrated for the unrelated STM32F769-Discovery board's
 the runtime's own `Setup_Pll` source rather than assumed, and fixed via
 that runtime's documented `gnat_user/` override mechanism.
 
+**A third difference, found only once real hardware bring-up started:
+porting a real network stack onto this bare-metal Ravenscar runtime
+surfaces hazards lwIP's own reference examples never have to deal
+with.** `f767zi`'s network telemetry feature (vendored HAL_ETH + lwIP
+`NO_SYS=1`, UDP Raw API, one `Telemetry_Sink` task driving both RX
+servicing and periodic TX) needed three real fixes before it worked on
+actual hardware, none of which were visible from reading the vendored
+source or either ST reference example alone:
+
+- The PHY link state was only ever checked once, at boot -- if
+  autonegotiation (normally a few hundred ms to ~2s) hadn't finished
+  at that instant, the interface stayed down forever. Fixed with a
+  periodic re-check from `Telemetry_Sink`'s own tick.
+- Two separate Cortex-M7 `UsageFault`s (confirmed via live GDB, CFSR's
+  UNALIGNED bit) in lwIP's RX path: this `-nolibc` runtime has
+  alignment-trap checking enabled, and the Ethernet header's 14 bytes
+  (not a multiple of 4) shift everything downstream to a
+  2-byte-misaligned offset that GCC's inlined `memcpy()`/struct-copy
+  code wasn't safe against. Fixed with a byte-safe `SMEMCPY` override
+  for the one macro-routed case, and a project-wide
+  `-mno-unaligned-access` compiler flag for the case that wasn't
+  (`ip4_addr_copy`, a plain, non-overridable struct assignment).
+- A genuine Cortex-M7 D-cache/Ethernet-DMA coherency gap on transmit:
+  the existing MPU non-cacheable carve-out covered the DMA descriptor
+  rings and the RX buffer pool, but not the ordinary cacheable heap
+  memory TX packets are actually built in -- so the DMA engine
+  (which bypasses the CPU cache entirely) could read stale/zeroed
+  memory for whatever the CPU had just written and not yet flushed.
+  Fixed with an explicit `SCB_CleanDCache_by_Addr()` over each transmit
+  buffer right before handing it to the DMA engine.
+
+See [`../f767zi/NETWORK_STACK.md`](../f767zi/NETWORK_STACK.md) for the
+full account -- concept of operations, and the complete Ada/C call
+sequence for initialization, transmit, and receive, each annotated
+with exactly where Ada hands control to C and back.
+
 # The Main Super Loop
 
 Inside the `Main` procedure we find that the super-loop is the most reliable and simplest way
