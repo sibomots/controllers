@@ -172,7 +172,7 @@ The author mentioned the ARM GCC toolchain.
 
 For Windows Git-SDK-64, the variant you want is:
 
-`arm-gnu-toolchain-14.2.rel1-mingw-w64-i686-arm-none-eabi.zip`
+[`arm-gnu-toolchain-14.2.rel1-mingw-w64-i686-arm-none-eabi.zip`](https://gitlab.arm.com/api/v4/projects/tooling%2Fgnu-toolchains-for-arm/packages/generic/gnu-toolchain/14.2.rel1/arm-gnu-toolchain-14.2.rel1-mingw-w64-i686-arm-none-eabi.zip)
 
 It's a ZIP file. Simply unzip the file inside a specific directory on your host. The author chooses `/c/arm`
 
@@ -241,7 +241,7 @@ From the shell:
 
 ```
 $ pacman -Syu \
-    mingw-w64-x86_64-openocd \
+    mingw-w64-ucrt-x86_64-openocd \
     mingw-w64-x86_64-cmake \
     mingw-w64-x86_64-make
 ```
