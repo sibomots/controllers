@@ -172,7 +172,7 @@ The author mentioned the ARM GCC toolchain.
 
 For Windows Git-SDK-64, the variant you want is:
 
-`arm-gnu-toolchain-14.2.rel1-mingw-w64-i686-arm-none-eabi.zip`
+[`arm-gnu-toolchain-14.2.rel1-mingw-w64-i686-arm-none-eabi.zip`](https://gitlab.arm.com/api/v4/projects/tooling%2Fgnu-toolchains-for-arm/packages/generic/gnu-toolchain/14.2.rel1/arm-gnu-toolchain-14.2.rel1-mingw-w64-i686-arm-none-eabi.zip)
 
 It's a ZIP file. Simply unzip the file inside a specific directory on your host. The author chooses `/c/arm`
 
@@ -213,6 +213,26 @@ Also install `cmake` and `make` from within the shell (needed by
 $ pacman -Syu mingw-w64-x86_64-cmake mingw-w64-x86_64-make
 ```
 
+- NOTE: cmake package would fail to install because `mingw-w64-x86_64-gcc-libs` was a dependency and was also in the ignore group.
+- Resolving this would allow cmake to install via the above command, but not be added to the usr/bin/ directory. From the mingw64/bin directory, I could run `$ ./cmake`, but the `buildw.sh` script would not find it in the expected `/usr/bin/cmake` location. 
+  ```
+  $ which make
+  /usr/bin/make
+
+  $ which cmake
+  /mingw64/bin/cmake
+  ```
+- Running `$ cp /mingw64/bin/cmake.exe /usr/bin/` resolved this, and the `buildw.sh` script executed without error 
+  ```
+  $ which make
+  /usr/bin/make
+
+  $ which cmake
+  /usr/bin/cmake
+  ```
+
+
+
 ## Hardware Interface
 
 In order to flash and debug on target you will need software that
@@ -241,10 +261,12 @@ From the shell:
 
 ```
 $ pacman -Syu \
-    mingw-w64-x86_64-openocd \
+    mingw-w64-ucrt-x86_64-openocd \
     mingw-w64-x86_64-cmake \
     mingw-w64-x86_64-make
 ```
+
+* NOTE: pacman couldn't find `mingw-w64-x86_64-openocd`, but was able to find [`mingw-w64-ucrt-x86_64-openocd`](https://packages.msys2.org/packages/mingw-w64-ucrt-x86_64-openocd). The tests listed after this worked as expected. 
 
 Enter *Yes* to all questions and proceed.
 
