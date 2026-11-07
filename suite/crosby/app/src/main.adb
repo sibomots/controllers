@@ -1,5 +1,5 @@
 -- ============================================================================
--- This file is part of Crosby -- see ../../crosby.gpr's own header.
+-- Crosby -- NUCLEO-F767ZI bare-metal Ada minimal example.
 --
 -- Copyright (c) 2026 Jeff Wandling
 -- All Rights Reserved.
@@ -12,36 +12,21 @@
 
 with Crosby.LED;
 
--- Blink LD1 using nothing but a busy-wait counter -- no timer
--- peripheral, no Ravenscar task, no protected object, no delay
--- statement anywhere in this program. "How fast" it blinks is a
--- direct function of this board's actual CPU clock and this loop's
--- compiled instruction count, neither of which this program attempts
--- to pin down precisely -- see crosby.gpr's own header on the
--- runtime's un-overridden Setup_Pll for why that's a deliberately
--- accepted looseness here, not an oversight.
+-- Blinks LD1 using a busy-wait counter. No timer, no task, no delay
+-- statement. The blink rate is a function of CPU clock and loop
+-- instruction count, neither pinned down precisely here -- see
+-- DESIGN.md.
 procedure Main is
    Counter : Natural := 0;
 
-   -- Volatile, deliberately: Counter's value, apart from the
-   -- threshold comparison below, has no externally visible effect --
-   -- without this, a sufficiently aggressive optimizer would be fully
-   -- entitled to collapse the counting loop entirely (dead-code
-   -- elimination on a loop whose only observable side effect, from
-   -- the compiler's point of view, is time spent). Marking it
-   -- Volatile forces every increment and comparison to actually
-   -- happen. This project's own Default_Switches("Ada") carry no
-   -- explicit -O flag (GCC's own default is then -O0, which would not
-   -- elide this today regardless) -- Volatile makes that safe against
-   -- someone later adding optimization switches without having to
-   -- remember why this loop would otherwise break.
+   -- Volatile so the counting loop can't be optimized away: without
+   -- this, Counter's only observable effect (from the compiler's
+   -- point of view) is time spent, and that's legal to delete.
    pragma Volatile (Counter);
 
    State : Boolean := False;
 
-   -- An arbitrary, empirically-adjustable iteration count -- not a
-   -- calibrated time duration. Raise or lower it directly to change
-   -- the blink rate; there is no clock-rate math behind this number.
+   -- Empirically adjustable; not a calibrated time duration.
    Loop_Threshold : constant := 2_000_000;
 begin
    Crosby.LED.Initialize;

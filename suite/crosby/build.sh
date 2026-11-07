@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #  ============================================================================
-#  This file is part of Crosby -- see crosby.gpr's own header.
+#  Crosby -- NUCLEO-F767ZI bare-metal Ada minimal example.
 #
 #  Copyright (c) 2026 Jeff Wandling
 #  All Rights Reserved.
@@ -25,17 +25,11 @@ SYNOPSIS
 
 DESCRIPTION
 
-    Builds Crosby, the minimal bare-metal Ada LED-blink example for
-    NUCLEO-F767ZI, via gprbuild (crosby.gpr), targeting arm-eabi with
-    the light-stm32f769disco runtime (non-tasking -- see crosby.gpr's
-    own header for why).
+    Builds Crosby via gprbuild (crosby.gpr), targeting arm-eabi with
+    the light-stm32f769disco runtime.
 
     This is the native-Linux flavor. For Windows (git-sdk-64 flavor of
     Git-for-Windows bash), use buildw.sh instead.
-
-    No ../../ada/f767zi-style one-time runtime-overrides step is
-    needed here -- this program makes no timing claim the runtime's
-    un-overridden clock bring-up could get wrong; see crosby.gpr.
 
 OPTIONS
 
@@ -84,9 +78,7 @@ do
    esac
 done
 
-## Sanity: this is the native-Linux flavor. If we're actually running
-## under an MSYS/MINGW shell (git-bash of either flavor), point at the
-## right script instead of pressing on with the wrong assumptions.
+## Sanity: this is the native-Linux flavor.
 case "$(uname -s)" in
     MINGW*|MSYS*)
         echo "This looks like a Windows git-bash shell (uname: $(uname -s))."
@@ -97,7 +89,6 @@ esac
 
 set -e
 
-# nuke it
 rm -rf obj bin
 
 if [ "$CleanOnly" = "yes" ]; then
@@ -105,8 +96,6 @@ if [ "$CleanOnly" = "yes" ]; then
     exit 0
 fi
 
-## Dependency guard -- fail clearly rather than letting gprbuild produce
-## a confusing error partway through. Skipped above for --clean-only.
 MissingTool="no"
 for tool in gprbuild arm-eabi-gcc; do
     if ! command -v "$tool" >/dev/null 2>&1; then
@@ -115,8 +104,7 @@ for tool in gprbuild arm-eabi-gcc; do
     fi
 done
 if [ "$MissingTool" = "yes" ]; then
-    echo "See ../../ada/SETUP.md for toolchain setup (same toolchain as"
-    echo "every other Ada port in this repo)."
+    echo "Install the GNAT ARM ELF toolchain and gprbuild, then retry."
     exit 1
 fi
 

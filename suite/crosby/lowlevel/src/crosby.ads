@@ -1,5 +1,5 @@
 -- ============================================================================
--- This file is part of Crosby -- see ../../crosby.gpr's own header.
+-- Crosby -- NUCLEO-F767ZI bare-metal Ada minimal example.
 --
 -- Copyright (c) 2026 Jeff Wandling
 -- All Rights Reserved.
@@ -10,8 +10,7 @@
 -- See the LICENSE file for the full text.
 -- ============================================================================
 
--- Root namespace for the Crosby application. Deliberately empty -- it
--- exists only so child packages (Crosby.LED, ...) have a common
--- parent, same role Bifrost plays in ../../../ada/f767zi/.
+-- Root namespace. Deliberately empty; exists only so child packages
+-- share a common parent.
 package Crosby is
 end Crosby;

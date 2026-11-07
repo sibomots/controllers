@@ -1,7 +1,5 @@
 -- ============================================================================
--- This file is part of Crosby -- a NUCLEO-F767ZI bare-metal Ada minimal
--- example, first of the controllers/suite collection (crosby, stills,
--- nash, young to follow).
+-- Crosby -- NUCLEO-F767ZI bare-metal Ada minimal example.
 --
 -- Copyright (c) 2026 Jeff Wandling
 -- All Rights Reserved.
@@ -12,37 +10,9 @@
 -- See the LICENSE file for the full text.
 -- ============================================================================
 
--- The absolute minimum bare-metal Ada "hello world" for this board:
--- blink user LED LD1 (PB0, confirmed against UM1974 Section 7.5/Table
--- 12 -- NOT assumed) with a plain busy-wait counter. No timer
--- peripheral, no Ravenscar task, no protected object, no interrupt --
--- see app/src/main.adb and lowlevel/src/crosby-led.ad* for why, and
--- see this file's own Runtime selection below for the architectural
--- half of that same guarantee.
---
--- Runtime: "light-stm32f769disco" -- the NON-tasking sibling of
--- ../../ada/f767zi's "light-tasking-stm32f769disco" (same underlying
--- board profile, same STM32F769NI-memory-map-identical justification
--- -- see ../../HARDWARE.md -- confirmed to bundle the same
--- Interfaces.STM32.RCC/.GPIO BSP units, just without Ravenscar
--- tasking support compiled in at all). Choosing the non-tasking
--- profile makes "no Thread/task" a property of what this program is
--- even capable of linking against, not merely a coding convention --
--- the strongest, most honest version of "minimal" available here.
---
--- One known, deliberately accepted consequence: this profile's own
--- Setup_Pll clock bring-up has NOT had ../../ada/f767zi/runtime-
--- overrides/README.md's real-hardware-confirmed fix applied to it (that
--- fix lives only in light-tasking-stm32f769disco's own toolchain
--- directory, per that README's own "only ever touches
--- light-tasking-stm32f769disco" note) -- so this board's actual SYSCLK
--- here is very likely running at the same ~1/3-of-intended rate that
--- investigation found, root cause still unknown. That's immaterial to
--- what this program actually does (a busy-wait counter has no
--- stated timing requirement to begin with), so it is not fixed here;
--- a future member of this suite that *does* need calibrated timing
--- should port that same override forward to this runtime profile
--- first, not assume this program's clock is correct.
+-- Blinks user LED LD1 with a busy-wait counter. No timer, no task, no
+-- protected object, no interrupt. See DESIGN.md for the runtime
+-- choice and its one known caveat.
 project Crosby is
 
    for Target use "arm-eabi";
@@ -68,11 +38,9 @@ project Crosby is
          "-ffunction-sections",
          "-fdata-sections");
 
-      -- Same accepted-risk rationale as ../../ada/f767zi/bifrost.gpr's
-      -- own Compiler package (and samv71_tiny.gpr's before that):
-      -- depending on Interfaces.STM32.* triggers GNAT's "internal GNAT
-      -- unit"/"non-portable and version-dependent" warning. Scoped to
-      -- exactly the one file that touches it, not blanket-silenced.
+      -- Interfaces.STM32.* is an internal GNAT unit; using it directly
+      -- triggers a "non-portable" warning. Accepted and suppressed
+      -- here, scoped to the one file that touches it.
       for Switches ("crosby-led.adb") use
         Compiler'Default_Switches ("Ada") & ("-gnatwI");
    end Compiler;

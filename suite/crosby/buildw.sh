@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #  ============================================================================
-#  This file is part of Crosby -- see crosby.gpr's own header.
+#  Crosby -- NUCLEO-F767ZI bare-metal Ada minimal example.
 #
 #  Copyright (c) 2026 Jeff Wandling
 #  All Rights Reserved.
@@ -25,22 +25,14 @@ SYNOPSIS
 
 DESCRIPTION
 
-    Builds Crosby, the minimal bare-metal Ada LED-blink example for
-    NUCLEO-F767ZI, via gprbuild (crosby.gpr), targeting arm-eabi with
-    the light-stm32f769disco runtime (non-tasking -- see crosby.gpr's
-    own header for why).
+    Builds Crosby via gprbuild (crosby.gpr), targeting arm-eabi with
+    the light-stm32f769disco runtime.
 
     Requires the standalone GNAT-FSF ARM ELF toolchain + gprbuild
-    (direct archive downloads, not Alire) -- same toolchain as every
-    other Ada port in this repo, see ../../ada/SETUP.md for setup.
+    (direct archive downloads, not Alire).
 
-    No ../../ada/f767zi-style one-time runtime-overrides step is
-    needed here -- this program makes no timing claim the runtime's
-    un-overridden clock bring-up could get wrong; see crosby.gpr.
-
-    Windows only (git-sdk-64 shell), same as the other Ada ports' own
-    buildw.sh. There is no Linux-native flavor of this script -- use
-    build.sh for that.
+    Windows only (git-sdk-64 shell). There is no Linux-native flavor
+    of this script -- use build.sh for that.
 
 OPTIONS
 
@@ -57,10 +49,6 @@ DEPENDENCIES
 
          gprbuild
          arm-eabi-gcc
-
-      If arm-eabi-gcc isn't the right name for what you actually have
-      installed, check the toolchain's own bin/ directory -- see
-      ../../ada/SETUP.md (toolchain PATH setup).
 
 BUILDW                    Crosby (F767ZI) Ada Build Script (Windows / git-sdk-64)
 EOM
@@ -100,14 +88,13 @@ case "$(uname -s)" in
         ;;
     *)
         echo "This does not look like a Windows git-bash shell (uname: $(uname -s))."
-        echo "This Ada build is Windows-only -- see the DESCRIPTION in --help."
+        echo "This build is Windows-only -- see the DESCRIPTION in --help, or use build.sh."
         exit 1
         ;;
 esac
 
 set -e
 
-# nuke it
 rm -rf obj bin
 
 if [ "$CleanOnly" = "yes" ]; then
@@ -115,8 +102,6 @@ if [ "$CleanOnly" = "yes" ]; then
     exit 0
 fi
 
-## Dependency guard -- fail clearly rather than letting gprbuild produce
-## a confusing error partway through. Skipped above for --clean-only.
 MissingTool="no"
 for tool in gprbuild arm-eabi-gcc; do
     if ! command -v "$tool" >/dev/null 2>&1; then
@@ -125,7 +110,7 @@ for tool in gprbuild arm-eabi-gcc; do
     fi
 done
 if [ "$MissingTool" = "yes" ]; then
-    echo "See ../../ada/SETUP.md for toolchain setup."
+    echo "Install the GNAT ARM ELF toolchain and gprbuild, then retry."
     exit 1
 fi
 

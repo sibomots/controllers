@@ -1,6 +1,6 @@
 #!/bin/bash
 #  ============================================================================
-#  This file is part of Crosby -- see crosby.gpr's own header.
+#  Crosby -- NUCLEO-F767ZI bare-metal Ada minimal example.
 #
 #  Copyright (c) 2026 Jeff Wandling
 #  All Rights Reserved.
@@ -32,9 +32,9 @@ SYNOPSIS
 
 DESCRIPTION
 
-    Native-Linux counterpart of setupw.sh -- same OpenOCD/ST-Link
-    debug chain, same stock target/stm32f7x.cfg, no local overrides.
-    For Windows (git-sdk-64), use setupw.sh instead.
+    Native-Linux OpenOCD/ST-Link debug chain for NUCLEO-F767ZI, using
+    the stock installed target/stm32f7x.cfg unmodified. For Windows
+    (git-sdk-64), use setupw.sh instead.
 
     There are options to:
 
@@ -87,7 +87,7 @@ DEPENDENCIES
 
          OpenOCD
          GNAT bare-metal ARM ELF toolchain (arm-eabi-gdb or
-         arm-none-eabi-gdb), see ../../ada/SETUP.md
+         arm-none-eabi-gdb)
 
 SETUP                     Crosby (F767ZI) Debug Setup (native Linux)
 EOM
@@ -96,7 +96,6 @@ EOM
 
 ## MAIN
 
-## Sanity: this is the native-Linux flavor.
 case "$(uname -s)" in
     MINGW*|MSYS*)
         echo "This looks like a Windows git-bash shell (uname: $(uname -s))."
@@ -111,11 +110,10 @@ if [ $# -lt 1 ]; then
 fi
 
 Mode="none"
-# Prefer arm-none-eabi-gdb over arm-eabi-gdb -- same reasoning as
-# setupw.sh: the GNAT-bundled one lacks libexpat/XML support, which
-# breaks gdb's "load" command silently (writes land as plain memory
-# writes instead of routing through real flash programming) rather
-# than with an obvious error.
+# Prefer arm-none-eabi-gdb over arm-eabi-gdb: the GNAT-bundled gdb
+# lacks libexpat/XML support, which breaks gdb's "load" command
+# silently (writes land as plain memory writes instead of routing
+# through real flash programming).
 GDB=$(which arm-none-eabi-gdb 2>/dev/null || which arm-eabi-gdb 2>/dev/null)
 S_DEBUG_IMAGE="bin/crosby.elf"
 S_DEBUG_SERVER_PORT="2331"
@@ -185,7 +183,6 @@ case $Mode in
        if [ ! -x "$GDB" ]; then
            echo "Cannot locate GDB-client.  Check usage."
            echo "Check you set PATH for where you stored your gdb"
-           echo "Did you download and install it? See ../../ada/SETUP.md"
            exit 1
        fi
        if [ ! -f "${S_DEBUG_IMAGE}" ]; then
